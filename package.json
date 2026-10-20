@@ -1,0 +1,24 @@
+{
+  "name": "slitsmart-factory-os",
+  "version": "1.0.0",
+  "description": "Progressive Enterprises - Industrial Slitting Optimizer & Production Management System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo Static site - no build step required"
+  },
+  "keywords": [
+    "slitting",
+    "converting",
+    "factory",
+    "production",
+    "polyester",
+    "film",
+    "paper"
+  ],
+  "author": "Progressive Enterprises",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
