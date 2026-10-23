@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Progressive Enterprises | SlitSmart Factory OS</title>
+  <title>SlitSmart | Progressive Enterprises</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
@@ -18,13 +18,7 @@
         <div class="brand-logo-card">
           <img src="logo.png" alt="Progressive Enterprises Logo" class="brand-logo-img">
         </div>
-        <div>
-          <div class="brand-title">SlitSmart Factory OS</div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="brand-tag">Progressive Enterprises</span>
-            <span style="font-size:0.72rem; color:var(--text-muted)">Single-Setup Zero-Changeover Engine</span>
-          </div>
-        </div>
+        <div class="brand-title">SlitSmart</div>
       </div>
 
       <div class="header-actions">
@@ -33,10 +27,6 @@
           <button class="role-btn active" data-role="manager">🏭 Manager</button>
           <button class="role-btn" data-role="customer">🤝 Customer</button>
         </div>
-
-        <button id="loadUserSampleBtn" class="btn btn-amber btn-sm" title="Load your 1000kg 23-micron Polyester example">
-          ⚡ Sample
-        </button>
 
         <button id="printJobCardBtn" class="btn btn-primary btn-sm">
           🖨️ Print Job Card
@@ -126,13 +116,7 @@
             <div id="plasticSpecificSection">
               <div class="form-group">
                 <label class="form-label">Film Type</label>
-                <select id="plasticFilmSelect" class="form-select">
-                  <option value="polyester" selected>Polyester (BOPET)</option>
-                  <option value="bopp">BOPP Film</option>
-                  <option value="cpp">CPP Film</option>
-                  <option value="pvc">Rigid PVC</option>
-                  <option value="custom">Custom Density</option>
-                </select>
+                <input type="text" id="filmTypeInput" class="form-input" value="Polyester" placeholder="e.g. Polyester" maxlength="40">
               </div>
               <div class="input-row form-group">
                 <div>
@@ -182,9 +166,6 @@
                 </div>
               </div>
             </div>
-            <div id="parentTolStatus" class="hint-text" style="color:var(--accent-orange);">
-              ⚡ <strong>Tol. Rule:</strong> ±2mm active when blades &gt; 12.
-            </div>
           </div>
         </div>
 
@@ -218,66 +199,22 @@
               </div>
             </div>
 
-            <!-- Benchmark chips + computed meters -->
+            <!-- Meters per cycle: factory standard / calculated from OD, or entered manually -->
             <div class="benchmark-box">
               <div class="benchmark-box-header">
-                <span>Max meters @ 10" OD:</span>
-                <strong id="computedRollMeterDisplay" style="color:var(--accent-orange); font-family:var(--font-mono);">1,600 m / set</strong>
+                <span>Meters per roll (cycle):</span>
+                <strong id="computedRollMeterDisplay" style="color:var(--accent-orange); font-family:var(--font-mono);">1,600 m</strong>
               </div>
-              <div class="hint-text" style="margin-bottom:0.3rem;">Benchmarks (click to apply):</div>
-              <div class="benchmark-chips" id="benchmarkChipsContainer">
-                <span class="benchmark-chip active" data-um="23" data-m="1600">23µm→1600m</span>
-                <span class="benchmark-chip" data-um="50" data-m="800">50µm→800m</span>
-                <span class="benchmark-chip" data-um="75" data-m="500">75µm→500m</span>
-                <span class="benchmark-chip" data-um="125" data-m="300">125µm→300m</span>
-                <span class="benchmark-chip" data-um="175" data-m="200">175µm→200m</span>
-                <span class="benchmark-chip" data-um="250" data-m="150">250µm→150m</span>
-                <span class="benchmark-chip" data-um="350" data-m="115">350µm→115m</span>
-              </div>
+              <div class="hint-text" id="rollMeterSource">Factory standard for 23 µm</div>
               <div class="manual-override-row">
                 <input type="checkbox" id="manualRollLengthCheck">
-                <label for="manualRollLengthCheck" style="font-size:0.72rem; cursor:pointer;">Manual override:</label>
-                <input type="number" id="manualRollLengthInput" class="form-input" style="width:80px; padding:0.2rem 0.4rem; font-size:0.78rem;" value="1600" disabled>
+                <label for="manualRollLengthCheck" style="font-size:0.72rem; cursor:pointer;">Enter length manually:</label>
+                <input type="number" id="manualRollLengthInput" class="form-input" style="width:80px; padding:0.2rem 0.4rem; font-size:0.78rem;" value="1600" min="10" step="10" disabled>
                 <span class="unit-label">m</span>
               </div>
             </div>
 
-            <!-- Trims & Slit Limits — 2×2 grid -->
             <div class="input-row form-group" style="margin-top:0.5rem;">
-              <div>
-                <label class="form-label">Min Left Trim</label>
-                <div class="input-with-unit">
-                  <input type="number" id="trimLeftInput" class="form-input" value="10" min="5" step="1">
-                  <span class="unit-label">mm</span>
-                </div>
-              </div>
-              <div>
-                <label class="form-label">Min Right Trim</label>
-                <div class="input-with-unit">
-                  <input type="number" id="trimRightInput" class="form-input" value="10" min="5" step="1">
-                  <span class="unit-label">mm</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="input-row form-group">
-              <div>
-                <label class="form-label">Min Slit Width <span style="font-weight:400;color:var(--text-muted)">(clash)</span></label>
-                <div class="input-with-unit">
-                  <input type="number" id="minSlitInput" class="form-input" value="12" min="5" step="1">
-                  <span class="unit-label">mm</span>
-                </div>
-              </div>
-              <div>
-                <label class="form-label">Tolerance Band</label>
-                <div class="input-with-unit">
-                  <input type="number" id="toleranceInput" class="form-input" value="15" min="1" max="50">
-                  <span class="unit-label">%</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="input-row form-group">
               <div>
                 <label class="form-label">Slitter Speed</label>
                 <div class="input-with-unit">
@@ -290,16 +227,6 @@
                 <div class="input-with-unit">
                   <input type="number" id="setupTimeInput" class="form-input" value="5" min="1" max="60" step="1">
                   <span class="unit-label">min</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="input-row form-group">
-              <div>
-                <label class="form-label">Max Knives on Shaft</label>
-                <div class="input-with-unit">
-                  <input type="number" id="maxKnivesInput" class="form-input" value="50" min="1" max="200" step="1">
-                  <span class="unit-label">knives</span>
                 </div>
               </div>
             </div>

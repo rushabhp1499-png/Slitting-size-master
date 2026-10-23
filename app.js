@@ -9,7 +9,7 @@ const state = {
   role: 'manager', // 'manager' or 'customer'
   master: {
     materialCategory: 'plastic', // 'plastic' or 'paper'
-    plasticType: 'polyester', // 'polyester', 'bopp', 'cpp', 'pvc', 'custom'
+    filmName: 'Polyester', // free-text film type typed by the user
     thicknessMicrons: 23,
     density: 1.395, // g/cm3 for BOPET
     paperGsm: 70,
@@ -18,11 +18,12 @@ const state = {
     widthMm: 1020, // standard parent roll width (1020 mm)
     parentTolMm: 2, // ±2 mm allowable parent roll tolerance
     weightKg: 1000,
-    minTrimLeft: 10,
-    minTrimRight: 10,
-    minSlitWidth: 12,
+    // Fixed factory settings (not shown in the UI)
+    minTrimLeft: 0,
+    minTrimRight: 0,
+    minSlitWidth: 6, // standard minimum slit width
     maxKnives: 50, // most knives the slitter shaft can hold
-    weightTolerancePct: 15,
+    weightTolerancePct: 15, // weight variance shown as OK vs High Var
     machineSpeed: 400,
     setupMinutes: 20,
     rollChangeMinutes: 5, // minutes per roll set changeover
@@ -67,34 +68,59 @@ const EMPIRICAL_OD10_BENCHMARKS = {
 };
 
 /**
- * Calculates Maximum Linear Web Length for a given Finished Roll OD and Core ID
- * Calibrated precisely against factory empirical converting standards.
+ * Decides the maximum meters per cycle (finished roll length):
+ * 1. Manual length, when the user ticked "Enter length manually"
+ * 2. Factory standard for a listed thickness (scaled if OD/core differ from 10" on 3")
+ * 3. Otherwise calculated from the target OD and core, calibrated against the factory standards
+ * Returns { meters, source } where source is a short explanation shown under the value.
  */
-function calculateRollLength(thicknessMicrons, targetOdInch, coreDiaInch) {
-  if (!thicknessMicrons || thicknessMicrons <= 0) return 1000;
-  if (targetOdInch === 10 && coreDiaInch === 3 && EMPIRICAL_OD10_BENCHMARKS[thicknessMicrons]) {
-    return EMPIRICAL_OD10_BENCHMARKS[thicknessMicrons];
+function resolveRollMeters(thicknessMicrons, targetOdInch, coreDiaInch) {
+  if (state.master.manualRollLength && state.master.manualRollMeters > 0) {
+    return { meters: Math.round(state.master.manualRollMeters), source: 'Entered manually' };
+  }
+  if (!thicknessMicrons || thicknessMicrons <= 0) {
+    return { meters: 1000, source: 'Enter a thickness to calculate' };
   }
 
   const baseAreaFactor = (10 * 10 - 3 * 3); // 91 sq. in (Standard reference for 10" OD / 3" Tube)
   const currentAreaFactor = (targetOdInch * targetOdInch - coreDiaInch * coreDiaInch);
-  if (currentAreaFactor <= 0) return 100;
+  if (currentAreaFactor <= 0) {
+    return { meters: 100, source: 'Target OD must be larger than the core' };
+  }
+  const isStandardRoll = targetOdInch === 10 && coreDiaInch === 3;
+
+  const standard = EMPIRICAL_OD10_BENCHMARKS[thicknessMicrons];
+  if (standard) {
+    const meters = Math.round(standard * (currentAreaFactor / baseAreaFactor));
+    return {
+      meters,
+      source: isStandardRoll
+        ? `Factory standard for ${thicknessMicrons} µm`
+        : `Factory standard for ${thicknessMicrons} µm, adjusted to ${targetOdInch}" OD on ${coreDiaInch}" core`
+    };
+  }
 
   // Calibrated constant ~ 37,200 um * m (from empirical measurements: 23um * 1600m = 36,800; 50um * 800m = 40,000)
   const baseConstant = 37200;
   const scaledConstant = baseConstant * (currentAreaFactor / baseAreaFactor);
-  return Math.max(50, Math.round(scaledConstant / thicknessMicrons));
+  return {
+    meters: Math.max(50, Math.round(scaledConstant / thicknessMicrons)),
+    source: `Calculated for ${thicknessMicrons} µm at ${targetOdInch}" OD on ${coreDiaInch}" core`
+  };
 }
 
-// Preset Materials
-const MATERIAL_PRESETS = {
-  polyester: { name: 'Polyester (BOPET) Film', density: 1.395, isFilm: true },
-  bopp:      { name: 'BOPP Film',              density: 0.905, isFilm: true },
-  cpp:       { name: 'CPP Film',               density: 0.900, isFilm: true },
-  pvc:       { name: 'Rigid PVC Film',         density: 1.380, isFilm: true },
-  paper:     { name: 'Paper / Board',          density: null,  isFilm: false, defaultGsm: 70 },
-  custom:    { name: 'Custom Material',        density: 1.000, isFilm: true }
-};
+/**
+ * Shows the meters-per-cycle value and where it came from (runs on every input, it's cheap)
+ */
+function updateRollMeterInfo() {
+  const isPlastic = state.master.materialCategory === 'plastic';
+  const thickness = isPlastic ? state.master.thicknessMicrons : state.master.paperThicknessMicrons;
+  const { meters, source } = resolveRollMeters(thickness, state.master.targetOdInch, state.master.coreDiaInch);
+  const valueEl = document.getElementById('computedRollMeterDisplay');
+  if (valueEl) valueEl.innerText = `${meters.toLocaleString()} m`;
+  const sourceEl = document.getElementById('rollMeterSource');
+  if (sourceEl) sourceEl.innerText = source;
+}
 
 // Palette for visual roll diagram
 const CUT_COLORS = [
@@ -167,19 +193,12 @@ function initUI() {
     });
   }
 
-  // Plastic Film type selector
-  const plasticSelect = document.getElementById('plasticFilmSelect');
-  if (plasticSelect) {
-    plasticSelect.addEventListener('change', (e) => {
-      state.master.plasticType = e.target.value;
-      const preset = MATERIAL_PRESETS[e.target.value];
-      if (preset && preset.density) {
-        state.master.density = preset.density;
-        const densInput = document.getElementById('densityInput');
-        if (densInput) densInput.value = preset.density;
-      }
-      state.master.userCycleOverride = null;
-      markResultsStale();
+  // Film type is a free-text label (only shown on the job card, so no recalculation needed)
+  const filmTypeInput = document.getElementById('filmTypeInput');
+  if (filmTypeInput) {
+    filmTypeInput.addEventListener('input', () => {
+      state.master.filmName = filmTypeInput.value.trim() || 'Polyester';
+      renderPrintJobCard();
     });
   }
 
@@ -232,8 +251,7 @@ function initUI() {
   const masterInputs = [
     'thicknessInput', 'densityInput',
     'masterWidthInput', 'parentTolInput', 'masterWeightInput', 
-    'trimLeftInput', 'trimRightInput', 'minSlitInput', 'toleranceInput',
-    'machineSpeedInput', 'setupTimeInput', 'targetOdInput', 'maxKnivesInput'
+    'machineSpeedInput', 'setupTimeInput', 'targetOdInput'
   ];
 
   masterInputs.forEach(id => {
@@ -257,28 +275,28 @@ function initUI() {
     });
   }
 
-  // Benchmark chips click listener
-  const benchmarkChips = document.querySelectorAll('.benchmark-chip');
-  benchmarkChips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      benchmarkChips.forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-
-      const um = parseFloat(chip.dataset.um);
-      state.master.thicknessMicrons = um;
-      const thickInput = document.getElementById('thicknessInput');
-      if (thickInput) thickInput.value = um;
-
-      if (state.master.materialCategory === 'paper' && paperThicknessInput) {
-        paperThicknessInput.value = um;
-        state.master.paperThicknessMicrons = um;
-      }
-
+  // Manual roll length: when ticked it replaces the factory standard / calculated meters
+  const manualCheck = document.getElementById('manualRollLengthCheck');
+  const manualInput = document.getElementById('manualRollLengthInput');
+  if (manualCheck && manualInput) {
+    const applyManual = () => {
+      manualInput.disabled = !manualCheck.checked;
+      state.master.manualRollLength = manualCheck.checked;
+      state.master.manualRollMeters = parseFloat(manualInput.value) || 0;
       state.master.userCycleOverride = null;
-      readMasterInputs();
+      updateRollMeterInfo();
       markResultsStale();
+    };
+    manualCheck.addEventListener('change', () => {
+      applyManual();
+      if (manualCheck.checked) manualInput.select();
     });
-  });
+    manualInput.addEventListener('input', applyManual);
+  }
+
+  // Keep the meters-per-roll readout live while thickness / OD / core are edited
+  document.addEventListener('input', updateRollMeterInfo);
+  document.addEventListener('change', updateRollMeterInfo);
 
   // Add cut row
   document.getElementById('addCutBtn').addEventListener('click', () => {
@@ -319,11 +337,6 @@ function initUI() {
     }
   });
 
-  // Preset buttons
-  document.getElementById('loadUserSampleBtn').addEventListener('click', () => {
-    loadUserSample();
-  });
-
   // Print button
   document.getElementById('printJobCardBtn').addEventListener('click', () => {
     if (state.resultsStale) calculateNow();
@@ -341,14 +354,9 @@ function readMasterInputs() {
   state.master.widthMm = parseFloat(document.getElementById('masterWidthInput')?.value) || 1020;
   state.master.parentTolMm = parseFloat(document.getElementById('parentTolInput')?.value) || 2;
   state.master.weightKg = parseFloat(document.getElementById('masterWeightInput')?.value) || 1000;
-  state.master.minTrimLeft = parseFloat(document.getElementById('trimLeftInput')?.value) || 10;
-  state.master.minTrimRight = parseFloat(document.getElementById('trimRightInput')?.value) || 10;
-  state.master.minSlitWidth = parseFloat(document.getElementById('minSlitInput')?.value) || 12;
-  state.master.weightTolerancePct = parseFloat(document.getElementById('toleranceInput')?.value) || 15;
   state.master.machineSpeed = parseFloat(document.getElementById('machineSpeedInput')?.value) || 400;
   state.master.rollChangeMinutes = parseFloat(document.getElementById('setupTimeInput')?.value) || 5;
   state.master.targetOdInch = parseFloat(document.getElementById('targetOdInput')?.value) || 10;
-  state.master.maxKnives = parseInt(document.getElementById('maxKnivesInput')?.value) || 50;
 }
 
 function calculateMaterialSpecs() {
@@ -377,11 +385,11 @@ function calculateMaterialSpecs() {
   if (lengthEl) lengthEl.innerText = `${state.master.linearMeters.toLocaleString()} m`;
 
   // Calculate Max Linear Meters for Target OD & Core Tube
-  state.master.maxRollMeters = calculateRollLength(
-    activeThicknessMicrons, 
-    state.master.targetOdInch, 
+  state.master.maxRollMeters = resolveRollMeters(
+    activeThicknessMicrons,
+    state.master.targetOdInch,
     state.master.coreDiaInch
-  );
+  ).meters;
 
   // UNIFORM CYCLES / ROUNDS CALCULATION (Zero odd stub rolls)
   let cyclesCount;
@@ -404,8 +412,7 @@ function calculateMaterialSpecs() {
   state.master.resultingOdInch = +resultingOd.toFixed(1);
 
   // Update UI Displays
-  const rollMeterDisp = document.getElementById('computedRollMeterDisplay');
-  if (rollMeterDisp) rollMeterDisp.innerText = `${state.master.uniformCycleMeters.toLocaleString()} m / cycle`;
+  updateRollMeterInfo();
 
   const maxMeterBadge = document.getElementById('maxMeterBadge');
   if (maxMeterBadge) maxMeterBadge.innerText = `${state.master.uniformCyclesCount} Uniform Cycles`;
@@ -1313,7 +1320,7 @@ function renderPrintJobCard() {
 
   let materialDesc = '';
   if (isPlastic) {
-    const pName = MATERIAL_PRESETS[state.master.plasticType]?.name || 'Polyester Film';
+    const pName = `${state.master.filmName || 'Polyester'} Film`;
     materialDesc = `${pName} | ${state.master.thicknessMicrons} µm | Density: ${state.master.density} g/cm³ (${state.master.gsm} GSM)`;
   } else {
     materialDesc = `Paper / Board | ${state.master.paperGsm} GSM (Tester) | Caliper: ${state.master.paperThicknessMicrons} µm`;
@@ -1542,66 +1549,4 @@ function renderPrintJobCard() {
       </div>
     </div>
   `;
-}
-
-// Load the user's specific sample order from prompt
-function loadUserSample() {
-  state.master.materialCategory = 'plastic';
-  state.master.widthMm = 1020; // 1020 mm standard parent roll as stated by user
-  state.master.parentTolMm = 2; // ±2 mm
-  state.master.weightKg = 1000;
-  state.master.thicknessMicrons = 23;
-  state.master.density = 1.395;
-  state.master.plasticType = 'polyester';
-  state.master.minTrimLeft = 10;
-  state.master.minTrimRight = 10;
-  state.master.minSlitWidth = 12;
-  state.master.coreDiaInch = 3;
-  state.master.targetOdInch = 10;
-  state.master.userCycleOverride = null;
-
-  // The user's exact specification:
-  // 50 kg of 15 mm, 80 kg of 20 mm, 100 kg of 18 mm, 60 kg of 120 mm
-  state.orders = [
-    { id: 1, width: 120, targetKg: 60 },
-    { id: 2, width: 20,  targetKg: 80 },
-    { id: 3, width: 18,  targetKg: 100 },
-    { id: 4, width: 15,  targetKg: 50 },
-    { id: 5, width: 25,  targetKg: 100 },
-    { id: 6, width: 30,  targetKg: 100 }
-  ];
-
-  // Update UI toggles and form inputs
-  const switchPlasticBtn = document.getElementById('switchPlasticBtn');
-  const switchPaperBtn = document.getElementById('switchPaperBtn');
-  const plasticSection = document.getElementById('plasticSpecificSection');
-  const paperSection = document.getElementById('paperSpecificSection');
-
-  if (switchPlasticBtn && switchPaperBtn) {
-    switchPlasticBtn.classList.add('active');
-    switchPaperBtn.classList.remove('active');
-  }
-  if (plasticSection) plasticSection.style.display = 'block';
-  if (paperSection) paperSection.style.display = 'none';
-
-  const plasticSelect = document.getElementById('plasticFilmSelect');
-  if (plasticSelect) plasticSelect.value = 'polyester';
-
-  const thickInput = document.getElementById('thicknessInput');
-  if (thickInput) thickInput.value = 23;
-  const densInput = document.getElementById('densityInput');
-  if (densInput) densInput.value = 1.395;
-  const widthInput = document.getElementById('masterWidthInput');
-  if (widthInput) widthInput.value = 1020;
-  const tolInput = document.getElementById('parentTolInput');
-  if (tolInput) tolInput.value = 2;
-  const weightInput = document.getElementById('masterWeightInput');
-  if (weightInput) weightInput.value = 1000;
-  const coreSelect = document.getElementById('coreDiaSelect');
-  if (coreSelect) coreSelect.value = '3';
-  const odInput = document.getElementById('targetOdInput');
-  if (odInput) odInput.value = 10;
-
-  renderOrdersTable();
-  calculateNow();
 }
