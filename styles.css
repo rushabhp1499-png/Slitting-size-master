@@ -60,7 +60,7 @@ header {
 }
 
 .header-inner {
-  max-width: 1400px;
+  max-width: none;
   margin: 0 auto;
   display: flex;
   justify-content: space-between;
@@ -201,7 +201,7 @@ header {
 
 /* Layout */
 .container {
-  max-width: 1440px;
+  max-width: none; /* use the full screen width */
   margin: 0.75rem auto;
   padding: 0 1rem;
 }
@@ -298,9 +298,24 @@ header {
 /* Grid layout for App */
 .main-grid {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 420px 1fr;
   gap: 0.85rem;
   align-items: start;
+}
+
+/* Core / OD / Length / Rounds side by side */
+.roll-fields-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 1.2fr 1fr;
+  gap: 0.4rem;
+}
+
+.roll-fields-row .form-input,
+.roll-fields-row .form-select {
+  width: 100%;
+  min-width: 0;
+  padding-left: 0.45rem;
+  padding-right: 0.3rem;
 }
 
 /* Calculate-on-demand: big button, paste panel, and dimmed results while inputs are unsaved */
@@ -647,13 +662,12 @@ body.results-stale .kpi-grid {
   border-radius: var(--radius);
   padding: 0.65rem 0.85rem;
   margin-bottom: 0.75rem;
-  overflow-x: auto;
+  overflow: hidden; /* the diagram always fits; it never scrolls */
 }
 
 .roll-schematic {
   width: 100%;
-  min-width: 860px; /* keeps narrow cuts readable; the wrapper scrolls on small screens */
-  height: 96px;
+  height: 110px;
   display: flex;
   border-radius: 6px;
   overflow: hidden;
@@ -685,7 +699,7 @@ body.results-stale .kpi-grid {
 }
 
 .seg-label {
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -714,7 +728,7 @@ body.results-stale .kpi-grid {
   );
   color: white;
   font-size: 0.65rem;
-  min-width: 18px !important; /* always wide enough for its vertical label */
+  min-width: 14px; /* thin trims stay visible and labelled */
   flex-shrink: 0;
 }
 
@@ -722,7 +736,6 @@ body.results-stale .kpi-grid {
   position: relative;
   height: 24px;
   width: 100%;
-  min-width: 860px;
   margin-top: 0.5rem;
   border-top: 1px solid var(--border-color);
   font-family: var(--font-mono);

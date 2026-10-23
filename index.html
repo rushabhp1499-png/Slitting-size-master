@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <!-- Bump ?v= on every release so browsers fetch the new files instead of a cached copy -->
-  <link rel="stylesheet" href="styles.css?v=2026-10-23-3">
+  <link rel="stylesheet" href="styles.css?v=2026-10-23-4">
 </head>
 <body>
 
@@ -181,41 +181,31 @@
           </div>
           <div class="card-body" id="machineCardBody">
 
-            <!-- Core & Target OD — side by side compact -->
-            <div class="input-row form-group">
+            <!-- Core, OD, Length & Rounds stay in sync: change one and the others update live -->
+            <div class="roll-fields-row form-group">
               <div>
-                <label class="form-label">Core (Paper Tube)</label>
+                <label class="form-label" for="coreDiaSelect">Core</label>
                 <select id="coreDiaSelect" class="form-select">
-                  <option value="3" selected>3" (76.2 mm) — Std</option>
-                  <option value="2">2" (50.8 mm)</option>
-                  <option value="1">1" (25.4 mm)</option>
+                  <option value="3" selected>3"</option>
+                  <option value="2">2"</option>
+                  <option value="1">1"</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">Target Finished OD</label>
-                <div class="input-with-unit">
-                  <input type="number" id="targetOdInput" class="form-input" value="10" step="0.5" min="4" max="40">
-                  <span class="unit-label">inch</span>
-                </div>
+                <label class="form-label" for="targetOdInput">OD (inch)</label>
+                <input type="number" id="targetOdInput" class="form-input" value="10" step="0.1" min="2" max="40">
+              </div>
+              <div>
+                <label class="form-label" for="rollLengthInput">Length (m)</label>
+                <input type="number" id="rollLengthInput" class="form-input" value="1528" step="10" min="1">
+              </div>
+              <div>
+                <label class="form-label" for="roundsInput">Rounds</label>
+                <input type="number" id="roundsInput" class="form-input" value="20" step="1" min="1">
               </div>
             </div>
 
-            <!-- Meters per cycle: factory standard / calculated from OD, or entered manually -->
-            <div class="benchmark-box">
-              <div class="benchmark-box-header">
-                <span>Meters per roll (cycle):</span>
-                <strong id="computedRollMeterDisplay" style="color:var(--accent-orange); font-family:var(--font-mono);">1,600 m</strong>
-              </div>
-              <div class="hint-text" id="rollMeterSource">Factory standard for 23 µm</div>
-              <div class="manual-override-row">
-                <input type="checkbox" id="manualRollLengthCheck">
-                <label for="manualRollLengthCheck" style="font-size:0.72rem; cursor:pointer;">Enter length manually:</label>
-                <input type="number" id="manualRollLengthInput" class="form-input" style="width:80px; padding:0.2rem 0.4rem; font-size:0.78rem;" value="1600" min="10" step="10" disabled>
-                <span class="unit-label">m</span>
-              </div>
-            </div>
-
-            <div class="input-row form-group" style="margin-top:0.5rem;">
+            <div class="input-row form-group">
               <div>
                 <label class="form-label">Slitter Speed</label>
                 <div class="input-with-unit">
@@ -305,41 +295,7 @@
           Sizes or roll specs changed. Press <strong>⚡ Calculate</strong> (or Enter) to update these results.
         </div>
 
-        <!-- Big Operator Action Directive Banner -->
-        <div class="operator-directive-banner no-print" id="operatorDirectiveBanner">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:6px;">
-            <div class="directive-badge">🎯 MANDATORY OPERATOR ACTION</div>
-            <span id="uniformOdBadge" class="badge badge-success">✓ 100% Uniform Roll OD</span>
-          </div>
-          <div class="directive-main-text" id="directiveMainText">
-            RUN 20 CYCLES OF EXACTLY 1,528 METERS EACH
-          </div>
-          <div class="directive-subtext" id="directiveSubText">
-            All finished rolls will have identical <strong>10.0" OD</strong> on <strong>3" Core</strong> | Single Knife Setup (Zero Changeover) | <strong>ZERO stub/odd rolls!</strong>
-          </div>
-          <div class="cycle-controls">
-            <span style="font-size:0.8rem; font-weight:600;">Fine-Tune Cycles:</span>
-            <button type="button" class="btn btn-sm btn-outline" id="decreaseCycleBtn">- 1 Round</button>
-            <span id="cycleCountDisplay" style="font-family:var(--font-mono); font-weight:700; font-size:1.05rem; padding:0 8px; color:var(--accent-orange);">20 Rounds</span>
-            <button type="button" class="btn btn-sm btn-outline" id="increaseCycleBtn">+ 1 Round</button>
-            <span style="font-size:0.72rem; color:var(--text-muted); margin-left:4px;">(Balances meter length per cycle equally)</span>
-          </div>
-        </div>
-
-        <!-- Recipe Selector Cards -->
-        <div class="no-print">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
-            <h3 style="font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px;">
-              <span>🎯</span> Blade Setup Recipes (Zero Changeover)
-            </h3>
-            <span style="font-size:0.72rem; color:var(--text-muted)">Click a recipe to preview</span>
-          </div>
-          <div class="recipe-cards-grid" id="recipeCardsContainer">
-            <!-- Dynamically generated recipe cards -->
-          </div>
-        </div>
-
-        <!-- Interactive Visual Roll Cross-Section -->
+        <!-- Interactive Visual Roll Cross-Section (main operator view, always fits the width) -->
         <div class="card">
           <div class="card-header">
             <div class="card-title"><span>📐</span> Master Roll Visual Cross-Section</div>
@@ -357,6 +313,19 @@
               </div>
               <div>Sizes in mm, left to right across the shaft</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Recipe Selector Cards -->
+        <div class="no-print">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <h3 style="font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span>🎯</span> Blade Setup Recipes (Zero Changeover)
+            </h3>
+            <span style="font-size:0.72rem; color:var(--text-muted)">Click a recipe to preview</span>
+          </div>
+          <div class="recipe-cards-grid" id="recipeCardsContainer">
+            <!-- Dynamically generated recipe cards -->
           </div>
         </div>
 
@@ -428,6 +397,6 @@
   </div>
 
   <!-- Core JavaScript -->
-  <script src="app.js?v=2026-10-23-3"></script>
+  <script src="app.js?v=2026-10-23-4"></script>
 </body>
 </html>

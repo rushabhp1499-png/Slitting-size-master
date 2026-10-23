@@ -31,8 +31,6 @@ const state = {
     // Finished Roll OD & Core Tube Specs
     coreDiaInch: 3, // 3" standard paper tube core
     targetOdInch: 10, // 10" max outside diameter
-    manualRollLength: false,
-    manualRollMeters: 1600,
     maxRollMeters: 1600,
     // Uniform Cycles (Guarantees zero stub rolls & uniform OD across all rolls)
     userCycleOverride: null,
@@ -68,59 +66,61 @@ const EMPIRICAL_OD10_BENCHMARKS = {
   350: 115
 };
 
-/**
- * Decides the maximum meters per cycle (finished roll length):
- * 1. Manual length, when the user ticked "Enter length manually"
- * 2. Factory standard for a listed thickness (scaled if OD/core differ from 10" on 3")
- * 3. Otherwise calculated from the target OD and core, calibrated against the factory standards
- * Returns { meters, source } where source is a short explanation shown under the value.
+/*
+ * Roll geometry: OD <-> meters per roll. Wound area grows with length × thickness, so
+ *   meters = K(t) / t × (OD² − core²) / (10² − 3²)
+ * where K(t) = thickness × meters for a 10" OD on a 3" core. For a listed thickness K comes
+ * from the factory standard (23 µm → 1600 m), otherwise ~37,200 (calibrated across the list).
  */
-function resolveRollMeters(thicknessMicrons, targetOdInch, coreDiaInch) {
-  if (state.master.manualRollLength && state.master.manualRollMeters > 0) {
-    return { meters: Math.round(state.master.manualRollMeters), source: 'Entered manually' };
-  }
-  if (!thicknessMicrons || thicknessMicrons <= 0) {
-    return { meters: 1000, source: 'Enter a thickness to calculate' };
-  }
+const STANDARD_ROLL_AREA = 10 * 10 - 3 * 3; // 91 sq. in: 10" OD on 3" core
 
-  const baseAreaFactor = (10 * 10 - 3 * 3); // 91 sq. in (Standard reference for 10" OD / 3" Tube)
-  const currentAreaFactor = (targetOdInch * targetOdInch - coreDiaInch * coreDiaInch);
-  if (currentAreaFactor <= 0) {
-    return { meters: 100, source: 'Target OD must be larger than the core' };
-  }
-  const isStandardRoll = targetOdInch === 10 && coreDiaInch === 3;
-
+function rollConstant(thicknessMicrons) {
   const standard = EMPIRICAL_OD10_BENCHMARKS[thicknessMicrons];
-  if (standard) {
-    const meters = Math.round(standard * (currentAreaFactor / baseAreaFactor));
-    return {
-      meters,
-      source: isStandardRoll
-        ? `Factory standard for ${thicknessMicrons} µm`
-        : `Factory standard for ${thicknessMicrons} µm, adjusted to ${targetOdInch}" OD on ${coreDiaInch}" core`
-    };
-  }
+  return standard ? standard * thicknessMicrons : 37200;
+}
 
-  // Calibrated constant ~ 37,200 um * m (from empirical measurements: 23um * 1600m = 36,800; 50um * 800m = 40,000)
-  const baseConstant = 37200;
-  const scaledConstant = baseConstant * (currentAreaFactor / baseAreaFactor);
-  return {
-    meters: Math.max(50, Math.round(scaledConstant / thicknessMicrons)),
-    source: `Calculated for ${thicknessMicrons} µm at ${targetOdInch}" OD on ${coreDiaInch}" core`
-  };
+function activeThicknessMicrons() {
+  return state.master.materialCategory === 'plastic'
+    ? state.master.thicknessMicrons
+    : (state.master.paperThicknessMicrons || Math.round(state.master.gsm * 1.3));
+}
+
+function metersForOd(odInch, coreInch, thicknessMicrons) {
+  const area = odInch * odInch - coreInch * coreInch;
+  if (area <= 0 || !thicknessMicrons) return 0;
+  return (rollConstant(thicknessMicrons) / thicknessMicrons) * (area / STANDARD_ROLL_AREA);
+}
+
+function odForMeters(meters, coreInch, thicknessMicrons) {
+  if (!thicknessMicrons) return coreInch;
+  return Math.sqrt(coreInch * coreInch + (meters * thicknessMicrons * STANDARD_ROLL_AREA) / rollConstant(thicknessMicrons));
 }
 
 /**
- * Shows the meters-per-cycle value and where it came from (runs on every input, it's cheap)
+ * Writes the current core / OD / length / rounds into their boxes,
+ * except the box the user is typing in (so their typing isn't overwritten).
  */
-function updateRollMeterInfo() {
-  const isPlastic = state.master.materialCategory === 'plastic';
-  const thickness = isPlastic ? state.master.thicknessMicrons : state.master.paperThicknessMicrons;
-  const { meters, source } = resolveRollMeters(thickness, state.master.targetOdInch, state.master.coreDiaInch);
-  const valueEl = document.getElementById('computedRollMeterDisplay');
-  if (valueEl) valueEl.innerText = `${meters.toLocaleString()} m`;
-  const sourceEl = document.getElementById('rollMeterSource');
-  if (sourceEl) sourceEl.innerText = source;
+function syncRollFields(skipId) {
+  const values = {
+    coreDiaSelect: String(state.master.coreDiaInch),
+    targetOdInput: state.master.resultingOdInch,
+    rollLengthInput: state.master.uniformCycleMeters,
+    roundsInput: state.master.uniformCyclesCount
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el && id !== skipId) el.value = value;
+  });
+}
+
+/**
+ * Live update after the user changes one of core / OD / length / rounds.
+ * Rounds don't change the knife layout, so this redraws without a new Calculate.
+ */
+function applyRollChange(editedId) {
+  calculateMaterialSpecs();
+  syncRollFields(editedId);
+  renderAll();
 }
 
 // Palette for visual roll diagram
@@ -140,6 +140,7 @@ function getColorForWidth(width) {
 document.addEventListener('DOMContentLoaded', () => {
   initUI();
   calculateMaterialSpecs();
+  syncRollFields();
   runOptimizer();
 });
 
@@ -228,31 +229,11 @@ function initUI() {
     });
   }
 
-  // Cycle Count Adjuster Buttons (- / +)
-  const decCycleBtn = document.getElementById('decreaseCycleBtn');
-  const incCycleBtn = document.getElementById('increaseCycleBtn');
-  if (decCycleBtn && incCycleBtn) {
-    decCycleBtn.addEventListener('click', () => {
-      const current = state.master.uniformCyclesCount || 1;
-      if (current > 1) {
-        state.master.userCycleOverride = current - 1;
-        calculateMaterialSpecs();
-        renderAll();
-      }
-    });
-    incCycleBtn.addEventListener('click', () => {
-      const current = state.master.uniformCyclesCount || 1;
-      state.master.userCycleOverride = current + 1;
-      calculateMaterialSpecs();
-      renderAll();
-    });
-  }
-
   // Numeric inputs listener
   const masterInputs = [
     'thicknessInput', 'densityInput',
-    'masterWidthInput', 'parentTolInput', 'masterWeightInput', 
-    'machineSpeedInput', 'setupTimeInput', 'targetOdInput'
+    'masterWidthInput', 'parentTolInput', 'masterWeightInput',
+    'machineSpeedInput', 'setupTimeInput'
   ];
 
   masterInputs.forEach(id => {
@@ -266,38 +247,55 @@ function initUI() {
     }
   });
 
-  // Core Diameter select listener
+  // ── Core / OD / Length / Rounds: four linked boxes, all live ──
+  // Rounds is the source of truth: length = total web ÷ rounds, OD follows from length.
   const coreSelect = document.getElementById('coreDiaSelect');
-  if (coreSelect) {
-    coreSelect.addEventListener('change', (e) => {
-      state.master.coreDiaInch = parseFloat(e.target.value) || 3;
-      state.master.userCycleOverride = null;
-      markResultsStale();
-    });
-  }
+  const odInput = document.getElementById('targetOdInput');
+  const lengthInput = document.getElementById('rollLengthInput');
+  const roundsInput = document.getElementById('roundsInput');
 
-  // Manual roll length: when ticked it replaces the factory standard / calculated meters
-  const manualCheck = document.getElementById('manualRollLengthCheck');
-  const manualInput = document.getElementById('manualRollLengthInput');
-  if (manualCheck && manualInput) {
-    const applyManual = () => {
-      manualInput.disabled = !manualCheck.checked;
-      state.master.manualRollLength = manualCheck.checked;
-      state.master.manualRollMeters = parseFloat(manualInput.value) || 0;
-      state.master.userCycleOverride = null;
-      updateRollMeterInfo();
-      markResultsStale();
-    };
-    manualCheck.addEventListener('change', () => {
-      applyManual();
-      if (manualCheck.checked) manualInput.select();
-    });
-    manualInput.addEventListener('input', applyManual);
-  }
+  // Core or OD changed: fit as much length as the OD allows -> rounds -> uniform length
+  coreSelect?.addEventListener('change', () => {
+    state.master.coreDiaInch = parseFloat(coreSelect.value) || 3;
+    state.master.userCycleOverride = null;
+    applyRollChange('coreDiaSelect');
+  });
+  odInput?.addEventListener('input', () => {
+    const od = parseFloat(odInput.value);
+    if (!(od > state.master.coreDiaInch)) return; // wait for a usable value
+    state.master.targetOdInch = od;
+    state.master.userCycleOverride = null;
+    applyRollChange('targetOdInput');
+  });
 
-  // Keep the meters-per-roll readout live while thickness / OD / core are edited
-  document.addEventListener('input', updateRollMeterInfo);
-  document.addEventListener('change', updateRollMeterInfo);
+  // Length changed: nearest whole number of rounds -> OD follows
+  lengthInput?.addEventListener('input', () => {
+    const meters = parseFloat(lengthInput.value);
+    if (!(meters > 0)) return;
+    state.master.userCycleOverride = Math.max(1, Math.round(state.master.linearMeters / meters));
+    applyRollChange('rollLengthInput');
+    state.master.targetOdInch = state.master.resultingOdInch;
+  });
+
+  // Rounds changed: length and OD follow
+  roundsInput?.addEventListener('input', () => {
+    const rounds = parseInt(roundsInput.value, 10);
+    if (!(rounds >= 1)) return;
+    state.master.userCycleOverride = rounds;
+    applyRollChange('roundsInput');
+    state.master.targetOdInch = state.master.resultingOdInch;
+  });
+
+  // Leaving a box tidies it to the actual value (e.g. uniform length, achievable OD)
+  [odInput, lengthInput, roundsInput].forEach(el => el?.addEventListener('change', () => syncRollFields()));
+
+  // Material / weight / width edits change the total web length, so refresh the roll boxes live
+  document.addEventListener('input', (e) => {
+    const id = e.target.id;
+    if (['targetOdInput', 'rollLengthInput', 'roundsInput'].includes(id) || e.target.classList.contains('row-input')) return;
+    calculateMaterialSpecs();
+    syncRollFields();
+  });
 
   // Add cut row
   document.getElementById('addCutBtn').addEventListener('click', () => {
@@ -357,7 +355,6 @@ function readMasterInputs() {
   state.master.weightKg = parseFloat(document.getElementById('masterWeightInput')?.value) || 1000;
   state.master.machineSpeed = parseFloat(document.getElementById('machineSpeedInput')?.value) || 400;
   state.master.rollChangeMinutes = parseFloat(document.getElementById('setupTimeInput')?.value) || 5;
-  state.master.targetOdInch = parseFloat(document.getElementById('targetOdInput')?.value) || 10;
 }
 
 function calculateMaterialSpecs() {
@@ -390,14 +387,11 @@ function calculateMaterialSpecs() {
   const lengthEl = document.getElementById('kpiLinearMeters');
   if (lengthEl) lengthEl.innerText = `${state.master.linearMeters.toLocaleString()} m`;
 
-  // Calculate Max Linear Meters for Target OD & Core Tube
-  state.master.maxRollMeters = resolveRollMeters(
-    activeThicknessMicrons,
-    state.master.targetOdInch,
-    state.master.coreDiaInch
-  ).meters;
+  // Most meters one roll can hold at the target OD on this core
+  state.master.maxRollMeters = Math.max(1,
+    metersForOd(state.master.targetOdInch, state.master.coreDiaInch, activeThicknessMicrons));
 
-  // UNIFORM CYCLES / ROUNDS CALCULATION (Zero odd stub rolls)
+  // UNIFORM CYCLES / ROUNDS (zero odd stub rolls): user-set rounds, or the fewest that fit the OD
   let cyclesCount;
   if (state.master.userCycleOverride && state.master.userCycleOverride > 0) {
     cyclesCount = state.master.userCycleOverride;
@@ -409,16 +403,9 @@ function calculateMaterialSpecs() {
   // EXACT Uniform meters per cycle:
   state.master.uniformCycleMeters = Math.round(state.master.linearMeters / cyclesCount);
 
-  // Calculate resulting OD
-  const baseAreaFactor = (10 * 10 - 3 * 3);
-  const baseConstant = 37200;
-  const targetArea = (state.master.uniformCycleMeters * activeThicknessMicrons) / baseConstant * baseAreaFactor;
-  const idSquared = (state.master.coreDiaInch * state.master.coreDiaInch);
-  const resultingOd = Math.sqrt(idSquared + Math.max(0, targetArea));
-  state.master.resultingOdInch = +resultingOd.toFixed(1);
-
-  // Update UI Displays
-  updateRollMeterInfo();
+  // Actual finished OD of those rolls
+  state.master.resultingOdInch = +odForMeters(
+    state.master.uniformCycleMeters, state.master.coreDiaInch, activeThicknessMicrons).toFixed(1);
 
   const maxMeterBadge = document.getElementById('maxMeterBadge');
   if (maxMeterBadge) maxMeterBadge.innerText = `${state.master.uniformCyclesCount} Uniform Cycles`;
@@ -558,6 +545,7 @@ function calculateNow() {
   const errorEl = document.getElementById('calcErrorBanner');
   try {
     calculateMaterialSpecs();
+    syncRollFields();
     updateOrdersSummary();
     runOptimizer();
     if (errorEl) errorEl.style.display = 'none';
@@ -1028,20 +1016,6 @@ function renderKPIRibbon() {
     }
   }
 
-  // Update Operator Action Directive Banner
-  const directiveMain = document.getElementById('directiveMainText');
-  if (directiveMain) {
-    directiveMain.innerText = `RUN ${totalSets} CYCLES OF EXACTLY ${setMeters.toLocaleString()} METERS EACH`;
-  }
-  const directiveSub = document.getElementById('directiveSubText');
-  if (directiveSub) {
-    directiveSub.innerHTML = `All finished rolls will have identical <strong>${state.master.resultingOdInch}" OD</strong> on <strong>${state.master.coreDiaInch}" Core</strong> | Single Knife Setup (${d.totalBlades} Cuts) | <strong>ZERO stub/odd rolls!</strong>`;
-  }
-  const cycleCountDisp = document.getElementById('cycleCountDisplay');
-  if (cycleCountDisp) {
-    cycleCountDisp.innerText = `${totalSets} Rounds`;
-  }
-
   // Update tolerance rule text in master card
   const parentTolStatus = document.getElementById('parentTolStatus');
   if (parentTolStatus) {
@@ -1166,17 +1140,8 @@ function renderRollVisualizer() {
   // Includes the parent-roll tolerance when used, so the strips always add up to 100%
   const rollWidth = d.effectiveRollWidth || masterWidth;
 
-  // Scale the diagram so even the narrowest strip is >= 16px wide (fits a vertical label);
-  // with very narrow cuts the diagram gets wider and its wrapper scrolls sideways.
-  // (The trim strip has its own CSS min-width, so it doesn't stretch the diagram.)
-  const stripWidths = d.cutsMap.filter(c => c.count > 0).map(c => c.width);
-  const narrowest = Math.max(1, Math.min(...stripWidths));
-  const minPx = Math.min(4000, Math.ceil(Math.max(860, rollWidth * (16 / narrowest))));
-  schematic.style.minWidth = `${minPx}px`;
-  if (scale) scale.style.minWidth = `${minPx}px`;
-
-  // Operator view: each strip shows only its size in mm. Strips too narrow for
-  // horizontal text get the size written vertically.
+  // Operator view: each strip shows only its size in mm. The diagram always fits the panel
+  // width (never scrolls); fitSegmentLabels() picks horizontal or vertical text per strip.
   function addSegment(widthMm, label, extraClass, color) {
     const pct = (widthMm / rollWidth) * 100;
     const seg = document.createElement('div');
@@ -1184,8 +1149,7 @@ function renderRollVisualizer() {
     seg.style.width = `${pct}%`;
     if (color) seg.style.backgroundColor = color;
     seg.title = label;
-    const isNarrow = pct < 6;
-    seg.innerHTML = `<span class="seg-label${isNarrow ? ' seg-label-vertical' : ''}">${label}</span>`;
+    seg.innerHTML = `<span class="seg-label">${label}</span>`;
     schematic.appendChild(seg);
   }
 
@@ -1209,7 +1173,35 @@ function renderRollVisualizer() {
       <div style="position:absolute; right:0;">${masterWidth} mm</div>
     `;
   }
+
+  fitSegmentLabels();
 }
+
+/**
+ * Makes every strip label fit its strip: large horizontal text when there is room,
+ * otherwise vertical text shrunk to the strip width (down to a 7px floor for very thin cuts).
+ */
+function fitSegmentLabels() {
+  document.querySelectorAll('#rollSchematic .roll-segment').forEach(seg => {
+    const label = seg.querySelector('.seg-label');
+    const w = seg.getBoundingClientRect().width;
+    if (!label || w === 0) return; // not laid out (hidden)
+    label.classList.remove('seg-label-vertical');
+    label.style.fontSize = '';
+    if (label.getBoundingClientRect().width <= w - 6) return; // horizontal fits
+
+    label.classList.add('seg-label-vertical');
+    // Vertical text with line-height 1 is about as wide as its font size
+    label.style.fontSize = `${Math.max(7, Math.min(15, Math.floor(w - 2)))}px`;
+  });
+}
+
+// Re-fit labels when the window size changes (strip widths change with it)
+let fitLabelsTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(fitLabelsTimer);
+  fitLabelsTimer = setTimeout(fitSegmentLabels, 100);
+});
 
 function renderComparisonTable() {
   if (!state.selectedSolution) return;
