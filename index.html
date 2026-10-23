@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <!-- Bump ?v= on every release so browsers fetch the new files instead of a cached copy -->
-  <link rel="stylesheet" href="styles.css?v=2026-10-23-5">
+  <link rel="stylesheet" href="styles.css?v=2026-10-24-1">
 </head>
 <body>
 
@@ -146,25 +146,15 @@
               <div class="hint-text">💡 Caliper determines finished roll OD &amp; meters per cycle.</div>
             </div>
 
-            <!-- Master Dimensions & Tolerance — 3 cols compact -->
-            <div class="input-row-3 form-group">
+            <!-- Master Dimensions (exact width; no tolerance is applied) -->
+            <div class="input-row form-group">
               <div>
-                <label class="form-label">Master Width</label>
-                <div class="input-with-unit">
-                  <input type="number" id="masterWidthInput" class="form-input" value="1020" step="5" min="100">
-                  <span class="unit-label">mm</span>
-                </div>
+                <label class="form-label" for="masterWidthInput">Master Width (mm)</label>
+                <input type="number" id="masterWidthInput" class="form-input" value="1020" step="5" min="100">
               </div>
               <div>
-                <label class="form-label">Tol. (±mm)</label>
-                <input type="number" id="parentTolInput" class="form-input" value="2" step="0.5" min="0" max="10">
-              </div>
-              <div>
-                <label class="form-label">Master Wt.</label>
-                <div class="input-with-unit">
-                  <input type="number" id="masterWeightInput" class="form-input" value="1000" step="10" min="10">
-                  <span class="unit-label">kg</span>
-                </div>
+                <label class="form-label" for="masterWeightInput">Master Wt. (kg)</label>
+                <input type="number" id="masterWeightInput" class="form-input" value="1000" step="10" min="10">
               </div>
             </div>
           </div>
@@ -302,6 +292,13 @@
                 <input type="text" id="operatorNameInput" class="form-input" placeholder="Operator name" maxlength="40">
               </div>
             </div>
+            <div class="input-row form-group">
+              <div>
+                <label class="form-label" for="jobQtyInput">Job Qty (kg)</label>
+                <input type="text" id="jobQtyInput" class="form-input" placeholder="e.g. 540" maxlength="20" inputmode="decimal">
+              </div>
+              <div></div>
+            </div>
             <div class="hint-text">Leave blank to write by hand on the printed card.</div>
           </div>
         </div>
@@ -366,7 +363,7 @@
                     <th>Cust. Req</th>
                     <th>Produced</th>
                     <th>Variance</th>
-                    <th>Tol.</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody id="comparisonTableBody"></tbody>
@@ -417,6 +414,6 @@
   </div>
 
   <!-- Core JavaScript -->
-  <script src="app.js?v=2026-10-23-5"></script>
+  <script src="app.js?v=2026-10-24-1"></script>
 </body>
 </html>

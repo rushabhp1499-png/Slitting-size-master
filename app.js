@@ -16,7 +16,6 @@ const state = {
     paperThicknessMicrons: 91, // calibrated ~ 1.3 um per GSM (editable by user)
     gsm: 32.085,
     widthMm: 1020, // standard parent roll width (1020 mm)
-    parentTolMm: 2, // ±2 mm allowable parent roll tolerance
     weightKg: 1000,
     // Fixed factory settings (not shown in the UI)
     // Minimum edge trim, always taken on one side: 6 mm above 150 µm, else 8 mm (set in calculateMaterialSpecs)
@@ -50,7 +49,7 @@ const state = {
     { id: 8, width: 45,  targetKg: 100 },
     { id: 9, width: 35,  targetKg: 80 }
   ],
-  jobCard: { machineNo: '', operatorName: '' }, // printed on the job card
+  jobCard: { machineNo: '', operatorName: '', jobQtyKg: '' }, // printed on the job card
   solutions: [],
   selectedSolution: null,
   customBlades: {} // manual fine-tuning map: { width: count }
@@ -197,7 +196,7 @@ function initUI() {
   }
 
   // Job card details: printed as typed (no recalculation needed)
-  [['machineNoInput', 'machineNo'], ['operatorNameInput', 'operatorName']].forEach(([id, key]) => {
+  [['machineNoInput', 'machineNo'], ['operatorNameInput', 'operatorName'], ['jobQtyInput', 'jobQtyKg']].forEach(([id, key]) => {
     const el = document.getElementById(id);
     el?.addEventListener('input', () => {
       state.jobCard[key] = el.value.trim();
@@ -242,7 +241,7 @@ function initUI() {
   // Numeric inputs listener
   const masterInputs = [
     'thicknessInput', 'densityInput',
-    'masterWidthInput', 'parentTolInput', 'masterWeightInput',
+    'masterWidthInput', 'masterWeightInput',
     'machineSpeedInput', 'setupTimeInput'
   ];
 
@@ -361,7 +360,6 @@ function readMasterInputs() {
   state.master.paperGsm = parseFloat(document.getElementById('paperGsmInput')?.value) || 70;
   state.master.paperThicknessMicrons = parseFloat(document.getElementById('paperThicknessInput')?.value) || 91;
   state.master.widthMm = parseFloat(document.getElementById('masterWidthInput')?.value) || 1020;
-  state.master.parentTolMm = parseFloat(document.getElementById('parentTolInput')?.value) || 2;
   state.master.weightKg = parseFloat(document.getElementById('masterWeightInput')?.value) || 1000;
   state.master.machineSpeed = parseFloat(document.getElementById('machineSpeedInput')?.value) || 400;
   state.master.rollChangeMinutes = parseFloat(document.getElementById('setupTimeInput')?.value) || 5;
@@ -647,8 +645,8 @@ function runOptimizer() {
   });
 
   const candidates = [];
-  const maxTolMm = state.master.parentTolMm || 2;
-  const maxSearchWidth = usableWidth + maxTolMm;
+  // The roll is exactly the master width (e.g. 1020 mm): no parent-roll tolerance is ever used
+  const maxSearchWidth = usableWidth;
   const minCuts = (minSum <= usableWidth) ? 1 : 0;
   const maxKnives = state.master.maxKnives || 50;
   let bladeLimitRejects = 0;
@@ -659,26 +657,11 @@ function runOptimizer() {
       bladeLimitRejects++;
       return null;
     }
-    const isTolAllowed = totalBlades > 12; // Factory rule: tolerance adjustment permitted only if > 12 blades
-    const allowedParentWidth = isTolAllowed ? (masterWidth + maxTolMm) : masterWidth;
-    const minRequiredTrim = (state.master.minTrimLeft + state.master.minTrimRight);
-    const maxAllowedCutsWidth = allowedParentWidth - minRequiredTrim;
+    // Cuts plus the minimum one-side trim must fit inside the master width
+    if (cutsWidth > usableWidth + 1e-9) return;
 
-    if (cutsWidth > maxAllowedCutsWidth) return;
-
-    // Determine if this candidate uses the parent roll tolerance
-    let usedTolMm = 0;
-    let effectiveRollWidth = masterWidth;
-    if (cutsWidth > usableWidth) {
-      if (!isTolAllowed) return; // Strict lock: cannot exceed nominal width if <= 12 blades
-      usedTolMm = +(cutsWidth - usableWidth).toFixed(1);
-      effectiveRollWidth = masterWidth + usedTolMm;
-    }
-
-    const trimWidth = effectiveRollWidth - cutsWidth;
-    if (trimWidth < minRequiredTrim && !isTolAllowed) return;
-
-    const scrapPct = (trimWidth / effectiveRollWidth) * 100;
+    const trimWidth = masterWidth - cutsWidth;
+    const scrapPct = (trimWidth / masterWidth) * 100;
 
     let totalWeightDiff = 0;
     let maxPctDiff = 0;
@@ -726,15 +709,12 @@ function runOptimizer() {
       cutsMap,
       cutsWidth,
       trimWidth,
-      effectiveRollWidth,
-      usedTolMm,
-      toleranceActive: usedTolMm > 0,
       // All trim goes on one side (never split), so knives start at 0 mm
       trimLeft: 0,
       trimRight: +trimWidth.toFixed(1),
       scrapPct: +scrapPct.toFixed(2),
-      scrapKg: +(masterWeight * (trimWidth / effectiveRollWidth)).toFixed(1),
-      fgKg: +(masterWeight * (cutsWidth / effectiveRollWidth)).toFixed(1),
+      scrapKg: +(masterWeight * (trimWidth / masterWidth)).toFixed(1),
+      fgKg: +(masterWeight * (cutsWidth / masterWidth)).toFixed(1),
       totalBlades,
       fulfilledCount,
       meanPctDiff: +meanPctDiff.toFixed(1),
@@ -1014,29 +994,7 @@ function renderKPIRibbon() {
 
   document.getElementById('kpiBlades').innerText = `${d.totalBlades} Cuts`;
   const bladesSubEl = document.getElementById('kpiBladesSub');
-  if (bladesSubEl) {
-    if (d.totalBlades > 12) {
-      if (d.usedTolMm > 0) {
-        bladesSubEl.innerHTML = `<strong style="color:var(--accent-orange)">⚡ Tol. +${d.usedTolMm}mm Active</strong>`;
-      } else {
-        bladesSubEl.innerHTML = `<span style="color:var(--accent-green)">⚡ Tol. Active (&gt;12 blades)</span>`;
-      }
-    } else {
-      bladesSubEl.innerHTML = `<span style="color:var(--text-muted)">🔒 Tol. Locked (&le;12 blades)</span>`;
-    }
-  }
-
-  // Update tolerance rule text in master card
-  const parentTolStatus = document.getElementById('parentTolStatus');
-  if (parentTolStatus) {
-    if (d.totalBlades > 12) {
-      parentTolStatus.innerHTML = `⚡ <strong>Tolerance Active:</strong> ${d.totalBlades} blades mounted (>12). ±${state.master.parentTolMm}mm parent roll tolerance is enabled for micro-fit.`;
-      parentTolStatus.style.color = 'var(--accent-green)';
-    } else {
-      parentTolStatus.innerHTML = `🔒 <strong>Tolerance Locked:</strong> Only ${d.totalBlades} blades mounted. Tolerance rule requires &gt; 12 blades.`;
-      parentTolStatus.style.color = 'var(--accent-amber)';
-    }
-  }
+  if (bladesSubEl) bladesSubEl.innerText = `${d.cutsWidth} mm of ${state.master.widthMm} mm used`;
 }
 
 function renderRecipeCards() {
@@ -1058,7 +1016,6 @@ function renderRecipeCards() {
       <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">
         Cuts: <strong>${d.totalBlades}</strong> (${d.cutsWidth} mm) | Trim: <strong>${d.trimWidth} mm</strong> (${d.scrapPct}%)
       </div>
-      ${d.usedTolMm > 0 ? `<div style="font-size:0.7rem; color:var(--accent-orange); margin-bottom:6px; font-weight:600;">⚡ +${d.usedTolMm} mm Parent Roll Tolerance Applied across ${d.totalBlades} Blades</div>` : ''}
       <div class="recipe-stats">
         <div><strong>FG Yield:</strong> ${d.fgKg} kg</div>
         <div><strong>Scrap Loss:</strong> ${d.scrapKg} kg</div>
@@ -1148,7 +1105,7 @@ function renderRollVisualizer() {
 
   const masterWidth = state.master.widthMm;
   // Includes the parent-roll tolerance when used, so the strips always add up to 100%
-  const rollWidth = d.effectiveRollWidth || masterWidth;
+  const rollWidth = masterWidth;
 
   // Operator view: each strip shows only its size in mm. The diagram always fits the panel
   // width (never scrolls); fitSegmentLabels() picks horizontal or vertical text per strip.
@@ -1263,9 +1220,7 @@ function renderPrintJobCard() {
   const setMeters = state.master.uniformCycleMeters;
   const resultingOd = state.master.resultingOdInch;
   const coreDia = state.master.coreDiaInch;
-  const rollWidth = d.effectiveRollWidth || state.master.widthMm;
-
-  const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const rollWidth = state.master.widthMm;
 
   const material = isPlastic
     ? `${escapeHtml(state.master.filmName || 'Polyester')} Film, ${state.master.thicknessMicrons} µm`
@@ -1316,7 +1271,7 @@ function renderPrintJobCard() {
     <div class="jc-header">
       <img src="logo.png" alt="Progressive Enterprises" class="jc-logo">
       <div class="jc-title">Job Card</div>
-      <div class="jc-date">Date: <strong>${dateStr}</strong></div>
+      <div class="jc-date">Date: <span class="jc-blank short"></span></div>
     </div>
 
     <div class="jc-details">
@@ -1329,6 +1284,7 @@ function renderPrintJobCard() {
     <div class="jc-specs">
       <div><span>Material</span><strong>${material}</strong></div>
       <div><span>Master Roll</span><strong>${state.master.widthMm} mm &times; ${state.master.weightKg} kg</strong></div>
+      <div><span>Job Qty</span><strong>${state.jobCard.jobQtyKg ? `${escapeHtml(state.jobCard.jobQtyKg)} kg` : '<span class="jc-blank short"></span> kg'}</strong></div>
       <div><span>Core / OD</span><strong>${coreDia}" / ${resultingOd}"</strong></div>
       <div><span>Length per Roll</span><strong>${setMeters.toLocaleString()} m</strong></div>
       <div><span>Rounds</span><strong>${totalSets}</strong></div>
@@ -1338,6 +1294,10 @@ function renderPrintJobCard() {
 
     <div class="jc-section-title">Master Roll Cross-Section <span>(sizes in mm, left to right; hatched = trim)</span></div>
     <div class="jc-roll">${stripsHtml}</div>
+    ${d.trimWidth > 0 ? `
+    <div class="jc-trim-callout" style="padding-right:${((d.trimWidth / 2) / rollWidth) * 100}%">
+      <span class="jc-trim-text">Trim = ${+d.trimWidth.toFixed(1)} mm</span><span class="jc-trim-arrow">&#9650;</span>
+    </div>` : ''}
     <div class="jc-ruler">
       <span>0</span><span>${Math.round(rollWidth / 2)} mm</span><span>${rollWidth} mm</span>
     </div>

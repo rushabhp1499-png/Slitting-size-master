@@ -1050,7 +1050,7 @@ body.customer-mode .customer-quote-banner {
 
   .jc-specs {
     display: grid;
-    grid-template-columns: 1.6fr 1.4fr 1fr 1fr 0.7fr 0.7fr 1fr;
+    grid-template-columns: 1.6fr 1.4fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr;
     border: 1px solid #000;
     margin-bottom: 4mm;
   }
@@ -1074,6 +1074,11 @@ body.customer-mode .customer-quote-banner {
 
   .jc-specs strong {
     font-size: 11pt;
+    white-space: nowrap;
+  }
+
+  .jc-specs .jc-blank.short {
+    min-width: 16mm;
   }
 
   .jc-section-title {
@@ -1131,6 +1136,29 @@ body.customer-mode .customer-quote-banner {
   .jc-trim span {
     background: #fff;
     padding: 1px 0;
+  }
+
+  /* Arrow under the hatched trim strip (right edge) */
+  .jc-trim-callout {
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    margin-top: 0.3mm;
+  }
+
+  .jc-trim-text {
+    font-size: 11pt;
+    font-weight: 800;
+    border: 1.5px solid #000;
+    padding: 0.4mm 2mm;
+    margin-right: 1mm;
+    margin-top: 1.5mm;
+  }
+
+  .jc-trim-arrow {
+    font-size: 10pt;
+    line-height: 1;
+    transform: translateX(50%);
   }
 
   .jc-ruler {
