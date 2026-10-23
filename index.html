@@ -22,7 +22,7 @@
           <div class="brand-title">SlitSmart Factory OS</div>
           <div style="display:flex; align-items:center; gap:8px;">
             <span class="brand-tag">Progressive Enterprises</span>
-            <span style="font-size:0.75rem; color:var(--text-muted)">Single-Setup Zero-Changeover Engine</span>
+            <span style="font-size:0.72rem; color:var(--text-muted)">Single-Setup Zero-Changeover Engine</span>
           </div>
         </div>
       </div>
@@ -30,12 +30,12 @@
       <div class="header-actions">
         <!-- Role toggle -->
         <div class="role-toggle">
-          <button class="role-btn active" data-role="manager">🏭 Production Manager</button>
-          <button class="role-btn" data-role="customer">🤝 Customer / Quoting View</button>
+          <button class="role-btn active" data-role="manager">🏭 Manager</button>
+          <button class="role-btn" data-role="customer">🤝 Customer</button>
         </div>
 
         <button id="loadUserSampleBtn" class="btn btn-amber btn-sm" title="Load your 1000kg 23-micron Polyester example">
-          ⚡ Load Sample Order
+          ⚡ Sample
         </button>
 
         <button id="printJobCardBtn" class="btn btn-primary btn-sm">
@@ -53,7 +53,7 @@
 
     <!-- Customer Quotation Banner (Visible in Customer View) -->
     <div class="customer-quote-banner">
-      <h3 style="color:var(--accent-green); margin-bottom:0.25rem;">Customer Slitting Feasibility & Quotation Mode</h3>
+      <h3 style="color:var(--accent-green); margin-bottom:0.25rem;">Customer Slitting Feasibility &amp; Quotation Mode</h3>
       <p style="font-size:0.85rem; color:var(--text-main);">
         Enter your raw material roll specifications and requested slit widths below. Our system will immediately calculate whether the order is physically feasible on a single roll, your exact expected delivery kg per size, and the minimal scrap percentage.
       </p>
@@ -62,19 +62,19 @@
     <!-- Top KPI Ribbon -->
     <div class="kpi-grid">
       <div class="kpi-card kpi-blue">
-        <div class="kpi-label">Finished Goods Produced</div>
+        <div class="kpi-label">Finished Goods</div>
         <div class="kpi-value" id="kpiFgWeight">-- kg</div>
         <div class="kpi-subtext" id="kpiFgSub">--% yield</div>
       </div>
 
       <div class="kpi-card kpi-amber">
-        <div class="kpi-label">Edge Scrap / Rejection</div>
+        <div class="kpi-label">Edge Scrap</div>
         <div class="kpi-value" id="kpiScrap">-- kg</div>
-        <div class="kpi-subtext" id="kpiScrapSub">Trim L: --mm | R: --mm</div>
+        <div class="kpi-subtext" id="kpiScrapSub">L: --mm | R: --mm</div>
       </div>
 
       <div class="kpi-card kpi-purple">
-        <div class="kpi-label">Total Web Length</div>
+        <div class="kpi-label">Web Length</div>
         <div class="kpi-value" id="kpiLinearMeters">-- m</div>
         <div class="kpi-subtext">Linear running meters</div>
       </div>
@@ -86,13 +86,13 @@
       </div>
 
       <div class="kpi-card kpi-blue">
-        <div class="kpi-label">Target Roll OD & Core</div>
+        <div class="kpi-label">Target OD &amp; Core</div>
         <div class="kpi-value" id="kpiTargetOd">10" OD</div>
         <div class="kpi-subtext" id="kpiCoreDia">3" Core (76.2 mm)</div>
       </div>
 
       <div class="kpi-card kpi-green">
-        <div class="kpi-label">Blade Setup & Tolerance</div>
+        <div class="kpi-label">Blade Setup</div>
         <div class="kpi-value" id="kpiBlades">-- Cuts</div>
         <div class="kpi-subtext" id="kpiBladesSub">Single Setup</div>
       </div>
@@ -101,48 +101,42 @@
     <!-- Main Grid: Left Config Panel, Right Results Panel -->
     <div class="main-grid">
 
-      <!-- LEFT COLUMN: Inputs & Order Entry -->
-      <div>
+      <!-- LEFT COLUMN: Inputs & Order Entry — now a single compact panel -->
+      <div class="left-panel">
 
-        <!-- Master Roll & Material Card -->
+        <!-- ── SECTION 1: Material & Roll Specs ── -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">
-              <span>📜</span> Master Roll & Material Specs
-            </div>
+            <div class="card-title"><span>📜</span> Material &amp; Roll Specs</div>
             <span class="badge badge-info" id="computedGsmBadge">32.085 GSM</span>
           </div>
           <div class="card-body">
-            
+
             <!-- Material Classification Switch -->
-            <div class="form-group">
-              <label class="form-label">Material Classification</label>
-              <div class="material-switch-container">
-                <button type="button" id="switchPlasticBtn" class="mat-switch-btn active" data-type="plastic">
-                  🎞️ Plastic / Film
-                </button>
-                <button type="button" id="switchPaperBtn" class="mat-switch-btn" data-type="paper">
-                  📄 Paper / Board
-                </button>
-              </div>
+            <div class="material-switch-container" style="margin-bottom:0.5rem;">
+              <button type="button" id="switchPlasticBtn" class="mat-switch-btn active" data-type="plastic">
+                🎞️ Plastic / Film
+              </button>
+              <button type="button" id="switchPaperBtn" class="mat-switch-btn" data-type="paper">
+                📄 Paper / Board
+              </button>
             </div>
 
             <!-- Plastic / Film Specific Section -->
             <div id="plasticSpecificSection">
               <div class="form-group">
-                <label class="form-label">Plastic Film Type</label>
+                <label class="form-label">Film Type</label>
                 <select id="plasticFilmSelect" class="form-select">
-                  <option value="polyester" selected>Polyester (BOPET) Film</option>
+                  <option value="polyester" selected>Polyester (BOPET)</option>
                   <option value="bopp">BOPP Film</option>
                   <option value="cpp">CPP Film</option>
-                  <option value="pvc">Rigid PVC Film</option>
-                  <option value="custom">Custom Density Film</option>
+                  <option value="pvc">Rigid PVC</option>
+                  <option value="custom">Custom Density</option>
                 </select>
               </div>
-
               <div class="input-row form-group">
                 <div>
-                  <label class="form-label">Thickness (Microns / µm)</label>
+                  <label class="form-label">Thickness (µm)</label>
                   <input type="number" id="thicknessInput" class="form-input" value="23" step="0.5" min="1">
                 </div>
                 <div>
@@ -156,148 +150,161 @@
             <div id="paperSpecificSection" style="display:none;">
               <div class="input-row form-group">
                 <div>
-                  <label class="form-label">Paper GSM (from Tester)</label>
+                  <label class="form-label">Paper GSM</label>
                   <input type="number" id="paperGsmInput" class="form-input" value="70" step="1" min="10">
                 </div>
                 <div>
-                  <label class="form-label">Paper Caliper / Thickness (µm)</label>
+                  <label class="form-label">Caliper (µm)</label>
                   <input type="number" id="paperThicknessInput" class="form-input" value="91" step="1" min="5">
                 </div>
               </div>
-              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:-0.5rem; margin-bottom:0.75rem;">
-                💡 Thickness determines finished roll OD and how many meters to run per uniform cycle.
-              </div>
+              <div class="hint-text">💡 Caliper determines finished roll OD &amp; meters per cycle.</div>
             </div>
 
-            <!-- Master Dimensions & Tolerance -->
+            <!-- Master Dimensions & Tolerance — 3 cols compact -->
             <div class="input-row-3 form-group">
               <div>
-                <label class="form-label">Master Width (mm)</label>
-                <input type="number" id="masterWidthInput" class="form-input" value="1020" step="5" min="100">
+                <label class="form-label">Master Width</label>
+                <div class="input-with-unit">
+                  <input type="number" id="masterWidthInput" class="form-input" value="1020" step="5" min="100">
+                  <span class="unit-label">mm</span>
+                </div>
               </div>
               <div>
-                <label class="form-label">Width Tol. (±mm)</label>
+                <label class="form-label">Tol. (±mm)</label>
                 <input type="number" id="parentTolInput" class="form-input" value="2" step="0.5" min="0" max="10">
               </div>
               <div>
-                <label class="form-label">Master Weight (kg)</label>
-                <input type="number" id="masterWeightInput" class="form-input" value="1000" step="10" min="10">
+                <label class="form-label">Master Wt.</label>
+                <div class="input-with-unit">
+                  <input type="number" id="masterWeightInput" class="form-input" value="1000" step="10" min="10">
+                  <span class="unit-label">kg</span>
+                </div>
               </div>
             </div>
-            <div id="parentTolStatus" style="font-size:0.75rem; color:var(--accent-orange); margin-top:-0.5rem; margin-bottom:0.75rem;">
-              ⚡ <strong>Tolerance Rule:</strong> ±2mm master roll tolerance is active when machine blades &gt; 12.
+            <div id="parentTolStatus" class="hint-text" style="color:var(--accent-orange);">
+              ⚡ <strong>Tol. Rule:</strong> ±2mm active when blades &gt; 12.
             </div>
-
           </div>
         </div>
 
-        <!-- Machine Limits, Rewind OD & Core Diameter Card -->
+        <!-- ── SECTION 2: Machine & Rewind (collapsible on desktop, always expanded) ── -->
         <div class="card operator-only">
-          <div class="card-header">
-            <div class="card-title">
-              <span>⚙️</span> Rewind OD, Core Tube & Machine Limits
+          <div class="card-header collapsible-header" id="machineCardHeader">
+            <div class="card-title"><span>⚙️</span> Machine Limits &amp; Rewind</div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="badge badge-orange" id="maxMeterBadge">Max 1,600m</span>
+              <span class="collapse-chevron" id="machineChevron">▲</span>
             </div>
-            <span class="badge badge-orange" id="maxMeterBadge">Max 1,600m / roll</span>
           </div>
-          <div class="card-body">
+          <div class="card-body" id="machineCardBody">
 
-            <!-- Rewind OD and Core Tube -->
+            <!-- Core & Target OD — side by side compact -->
             <div class="input-row form-group">
               <div>
-                <label class="form-label">Paper Tube Dia (Core ID)</label>
+                <label class="form-label">Core (Paper Tube)</label>
                 <select id="coreDiaSelect" class="form-select">
-                  <option value="3" selected>3 inch (76.2 mm) - Standard</option>
-                  <option value="2">2 inch (50.8 mm)</option>
-                  <option value="1">1 inch (25.4 mm)</option>
+                  <option value="3" selected>3" (76.2 mm) — Std</option>
+                  <option value="2">2" (50.8 mm)</option>
+                  <option value="1">1" (25.4 mm)</option>
                 </select>
               </div>
               <div>
-                <label class="form-label">Target Finished Roll OD</label>
-                <div style="display:flex; align-items:center; gap:6px;">
+                <label class="form-label">Target Finished OD</label>
+                <div class="input-with-unit">
                   <input type="number" id="targetOdInput" class="form-input" value="10" step="0.5" min="4" max="40">
-                  <span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">inch</span>
+                  <span class="unit-label">inch</span>
                 </div>
               </div>
             </div>
 
-            <!-- Calculated Max Roll Length -->
-            <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:6px; padding:0.6rem 0.75rem; margin-bottom:0.75rem;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
-                <span style="font-size:0.78rem; font-weight:600;">Max Linear Meters for 10" OD:</span>
-                <strong id="computedRollMeterDisplay" style="color:var(--accent-orange); font-family:var(--font-mono); font-size:0.95rem;">1,600 m / set</strong>
+            <!-- Benchmark chips + computed meters -->
+            <div class="benchmark-box">
+              <div class="benchmark-box-header">
+                <span>Max meters @ 10" OD:</span>
+                <strong id="computedRollMeterDisplay" style="color:var(--accent-orange); font-family:var(--font-mono);">1,600 m / set</strong>
               </div>
-              <div style="font-size:0.7rem; color:var(--text-muted);">
-                Quick Factory Benchmarks (Click to apply micron & length):
-              </div>
+              <div class="hint-text" style="margin-bottom:0.3rem;">Benchmarks (click to apply):</div>
               <div class="benchmark-chips" id="benchmarkChipsContainer">
-                <span class="benchmark-chip active" data-um="23" data-m="1600">23µm → 1600m</span>
-                <span class="benchmark-chip" data-um="50" data-m="800">50µm → 800m</span>
-                <span class="benchmark-chip" data-um="75" data-m="500">75µm → 500m</span>
-                <span class="benchmark-chip" data-um="125" data-m="300">125µm → 300m</span>
-                <span class="benchmark-chip" data-um="175" data-m="200">175µm → 200m</span>
-                <span class="benchmark-chip" data-um="250" data-m="150">250µm → 150m</span>
-                <span class="benchmark-chip" data-um="350" data-m="115">350µm → 115m</span>
+                <span class="benchmark-chip active" data-um="23" data-m="1600">23µm→1600m</span>
+                <span class="benchmark-chip" data-um="50" data-m="800">50µm→800m</span>
+                <span class="benchmark-chip" data-um="75" data-m="500">75µm→500m</span>
+                <span class="benchmark-chip" data-um="125" data-m="300">125µm→300m</span>
+                <span class="benchmark-chip" data-um="175" data-m="200">175µm→200m</span>
+                <span class="benchmark-chip" data-um="250" data-m="150">250µm→150m</span>
+                <span class="benchmark-chip" data-um="350" data-m="115">350µm→115m</span>
               </div>
-
-              <!-- Manual override option -->
-              <div style="display:flex; align-items:center; gap:8px; margin-top:0.6rem; padding-top:0.4rem; border-top:1px solid var(--border-color);">
+              <div class="manual-override-row">
                 <input type="checkbox" id="manualRollLengthCheck">
-                <label for="manualRollLengthCheck" style="font-size:0.75rem; cursor:pointer;">Manual Set Length Override:</label>
-                <input type="number" id="manualRollLengthInput" class="form-input" style="width:90px; padding:0.25rem 0.5rem; font-size:0.8rem;" value="1600" disabled>
-                <span style="font-size:0.75rem; color:var(--text-muted)">m</span>
+                <label for="manualRollLengthCheck" style="font-size:0.72rem; cursor:pointer;">Manual override:</label>
+                <input type="number" id="manualRollLengthInput" class="form-input" style="width:80px; padding:0.2rem 0.4rem; font-size:0.78rem;" value="1600" disabled>
+                <span class="unit-label">m</span>
               </div>
             </div>
 
-            <!-- Machine Slit & Trim Limits -->
-            <div class="input-row form-group">
+            <!-- Trims & Slit Limits — 2×2 grid -->
+            <div class="input-row form-group" style="margin-top:0.5rem;">
               <div>
-                <label class="form-label">Min Left Trim (mm)</label>
-                <input type="number" id="trimLeftInput" class="form-input" value="10" min="5" step="1">
+                <label class="form-label">Min Left Trim</label>
+                <div class="input-with-unit">
+                  <input type="number" id="trimLeftInput" class="form-input" value="10" min="5" step="1">
+                  <span class="unit-label">mm</span>
+                </div>
               </div>
               <div>
-                <label class="form-label">Min Right Trim (mm)</label>
-                <input type="number" id="trimRightInput" class="form-input" value="10" min="5" step="1">
-              </div>
-            </div>
-
-            <div class="input-row form-group">
-              <div>
-                <label class="form-label">
-                  Min Slit Width (mm)
-                  <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Clash limit)</span>
-                </label>
-                <input type="number" id="minSlitInput" class="form-input" value="12" min="5" step="1">
-              </div>
-              <div>
-                <label class="form-label">Tolerance Band (±%)</label>
-                <input type="number" id="toleranceInput" class="form-input" value="15" min="1" max="50">
+                <label class="form-label">Min Right Trim</label>
+                <div class="input-with-unit">
+                  <input type="number" id="trimRightInput" class="form-input" value="10" min="5" step="1">
+                  <span class="unit-label">mm</span>
+                </div>
               </div>
             </div>
 
             <div class="input-row form-group">
               <div>
-                <label class="form-label">Slitter Speed (m/min)</label>
-                <input type="number" id="machineSpeedInput" class="form-input" value="400" min="50" max="1200" step="50">
+                <label class="form-label">Min Slit Width <span style="font-weight:400;color:var(--text-muted)">(clash)</span></label>
+                <div class="input-with-unit">
+                  <input type="number" id="minSlitInput" class="form-input" value="12" min="5" step="1">
+                  <span class="unit-label">mm</span>
+                </div>
               </div>
               <div>
-                <label class="form-label">Roll Change Time (min/set)</label>
-                <input type="number" id="setupTimeInput" class="form-input" value="5" min="1" max="60" step="1">
+                <label class="form-label">Tolerance Band</label>
+                <div class="input-with-unit">
+                  <input type="number" id="toleranceInput" class="form-input" value="15" min="1" max="50">
+                  <span class="unit-label">%</span>
+                </div>
               </div>
             </div>
+
+            <div class="input-row form-group">
+              <div>
+                <label class="form-label">Slitter Speed</label>
+                <div class="input-with-unit">
+                  <input type="number" id="machineSpeedInput" class="form-input" value="400" min="50" max="1200" step="50">
+                  <span class="unit-label">m/min</span>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Roll Change Time</label>
+                <div class="input-with-unit">
+                  <input type="number" id="setupTimeInput" class="form-input" value="5" min="1" max="60" step="1">
+                  <span class="unit-label">min</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Customer Order Intake Card -->
+        <!-- ── SECTION 3: Slit Requirements ── -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">
-              <span>📋</span> Customer Slit Requirements
-            </div>
+            <div class="card-title"><span>📋</span> Slit Requirements</div>
             <button id="addCutBtn" class="btn btn-outline btn-sm">+ Add Size</button>
           </div>
-          <div class="card-body">
+          <div class="card-body" style="padding-top:0.4rem;">
 
-            <!-- Alerts for mechanical limits & capacity -->
             <div id="mechanicalAlert" style="display:none;"></div>
             <div id="feasibilityBanner" style="display:none;"></div>
 
@@ -305,11 +312,11 @@
               <table class="order-table">
                 <thead>
                   <tr>
-                    <th style="width:40px;">#</th>
+                    <th style="width:32px;">#</th>
                     <th>Cut Width</th>
                     <th>Target Wt</th>
                     <th>Feasibility</th>
-                    <th style="width:30px;"></th>
+                    <th style="width:28px;"></th>
                   </tr>
                 </thead>
                 <tbody id="ordersTableBody">
@@ -318,15 +325,15 @@
               </table>
             </div>
 
-            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.5rem; border-top:1px solid var(--border-color); font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:0.4rem; border-top:1px solid var(--border-color); font-size:0.82rem;">
               <span style="color:var(--text-muted)">Total Requested:</span>
-              <strong id="totalTargetKgDisplay" style="color:var(--accent-blue); font-family:var(--font-mono); font-size:1rem;">-- kg</strong>
+              <strong id="totalTargetKgDisplay" style="color:var(--accent-blue); font-family:var(--font-mono); font-size:0.95rem;">-- kg</strong>
             </div>
 
           </div>
         </div>
 
-      </div>
+      </div><!-- end .left-panel -->
 
       <!-- RIGHT COLUMN: Optimization Results, Roll Diagram & Job Card -->
         <!-- Big Operator Action Directive Banner -->
@@ -342,23 +349,22 @@
             All finished rolls will have identical <strong>10.0" OD</strong> on <strong>3" Core</strong> | Single Knife Setup (Zero Changeover) | <strong>ZERO stub/odd rolls!</strong>
           </div>
           <div class="cycle-controls">
-            <span style="font-size:0.8rem; font-weight:600;">Fine-Tune Cycles (Rounds):</span>
+            <span style="font-size:0.8rem; font-weight:600;">Fine-Tune Cycles:</span>
             <button type="button" class="btn btn-sm btn-outline" id="decreaseCycleBtn">- 1 Round</button>
             <span id="cycleCountDisplay" style="font-family:var(--font-mono); font-weight:700; font-size:1.05rem; padding:0 8px; color:var(--accent-orange);">20 Rounds</span>
             <button type="button" class="btn btn-sm btn-outline" id="increaseCycleBtn">+ 1 Round</button>
-            <span style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">(Adjusting rounds balances meter length per cycle equally)</span>
+            <span style="font-size:0.72rem; color:var(--text-muted); margin-left:4px;">(Balances meter length per cycle equally)</span>
           </div>
         </div>
 
         <!-- Recipe Selector Cards -->
         <div class="no-print">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-            <h3 style="font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:8px;">
-              <span>🎯</span> Machine Blade Setup Recipes (Zero Changeover)
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <h3 style="font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <span>🎯</span> Blade Setup Recipes (Zero Changeover)
             </h3>
-            <span style="font-size:0.75rem; color:var(--text-muted)">Click a recipe to preview blade layout</span>
+            <span style="font-size:0.72rem; color:var(--text-muted)">Click a recipe to preview</span>
           </div>
-
           <div class="recipe-cards-grid" id="recipeCardsContainer">
             <!-- Dynamically generated recipe cards -->
           </div>
@@ -367,151 +373,114 @@
         <!-- Interactive Visual Roll Cross-Section -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">
-              <span>📐</span> Master Roll Visual Cross-Section Map
-            </div>
-            <span style="font-size:0.8rem; color:var(--text-muted)">1000 mm Master Web View</span>
+            <div class="card-title"><span>📐</span> Master Roll Visual Cross-Section</div>
+            <span style="font-size:0.78rem; color:var(--text-muted)" id="masterWidthLabel">1020 mm Web</span>
           </div>
           <div class="card-body">
-            
             <div class="roll-viz-wrapper">
-              <div class="roll-schematic" id="rollSchematic">
-                <!-- Segments populated dynamically -->
-              </div>
-              <div class="ruler-scale" id="rulerScale">
-                <!-- Ruler markings -->
-              </div>
+              <div class="roll-schematic" id="rollSchematic"></div>
+              <div class="ruler-scale" id="rulerScale"></div>
             </div>
-
-            <!-- Legend & Instructions -->
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; color:var(--text-muted); flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--text-muted); flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:12px;">
-                <span><strong style="color:var(--accent-red)">■</strong> Side Trim (Offcut Scrap)</span>
+                <span><strong style="color:var(--accent-red)">■</strong> Side Trim (Scrap)</span>
                 <span><strong>■</strong> Slit Finished Reels</span>
               </div>
-              <div>Hover over reels to inspect reel weights & linear meters</div>
+              <div>Hover reels to inspect weight &amp; meters</div>
             </div>
-
           </div>
         </div>
 
         <!-- Weight Variance & Fine-Tuner Card -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">
-              <span>⚖️</span> Customer Weight Delivery & Blade Fine-Tuner
-            </div>
-            <span class="badge badge-info manual-controls">Production Manager Live Override</span>
+            <div class="card-title"><span>⚖️</span> Weight Delivery &amp; Blade Fine-Tuner</div>
+            <span class="badge badge-info manual-controls">Manager Live Override</span>
           </div>
           <div class="card-body">
-            
             <div class="table-responsive">
               <table class="comp-table">
                 <thead>
                   <tr>
                     <th>Slit Width</th>
-                    <th>Blades (Count)</th>
+                    <th>Blades</th>
                     <th>Span (mm)</th>
-                    <th>Customer Req</th>
-                    <th>Produced Kg</th>
-                    <th>Variance (Δ)</th>
-                    <th>Tolerance</th>
+                    <th>Cust. Req</th>
+                    <th>Produced</th>
+                    <th>Variance</th>
+                    <th>Tol.</th>
                   </tr>
                 </thead>
-                <tbody id="comparisonTableBody">
-                  <!-- Comparison rows -->
-                </tbody>
+                <tbody id="comparisonTableBody"></tbody>
               </table>
             </div>
-
-            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">
-              💡 <strong>Tip for Production Manager:</strong> You can click <strong>+</strong> or <strong>-</strong> on any size's blade count above to customize the setup. The roll diagram, trim mm, and scrap percentage will recalculate instantly.
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.4rem;">
+              💡 Click <strong>+</strong> / <strong>-</strong> on any size's blade count to fine-tune. Roll diagram recalculates instantly.
             </div>
-
           </div>
         </div>
 
         <!-- Finished Roll Sets & Packaging Breakdown Card -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">
-              <span>📦</span> Finished Roll Sets & Packaging Manifest
-            </div>
+            <div class="card-title"><span>📦</span> Finished Roll Sets &amp; Packaging</div>
             <span class="badge badge-orange" id="setsCardBadge">-- Sets @ -- m / set</span>
           </div>
           <div class="card-body">
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.5rem;">
-              Based on <strong>Target OD</strong> and <strong>Paper Tube Dia</strong>, the master roll must be slit across sets (rounds) of roll changeovers:
-            </div>
-            
             <div class="table-responsive">
               <table class="comp-table">
                 <thead>
                   <tr>
                     <th>Slit Size</th>
-                    <th>Cuts / Set</th>
-                    <th>Rolls / Set</th>
-                    <th>Total Finished Rolls</th>
-                    <th>Weight / Single Roll</th>
-                    <th>Total Output Weight</th>
-                    <th>Packaging / Core</th>
+                    <th>Cuts/Set</th>
+                    <th>Rolls/Set</th>
+                    <th>Total Rolls</th>
+                    <th>Wt/Roll</th>
+                    <th>Total Wt</th>
+                    <th>Core</th>
                   </tr>
                 </thead>
-                <tbody id="rollSetsTableBody">
-                  <!-- Dynamically populated -->
-                </tbody>
+                <tbody id="rollSetsTableBody"></tbody>
               </table>
             </div>
-
-            <div id="setsSummaryFooter" style="margin-top:0.75rem; padding:0.5rem; background:var(--bg-main); border-radius:4px; font-size:0.78rem; color:var(--text-muted);">
-              <!-- Summary of sets -->
-            </div>
+            <div id="setsSummaryFooter" style="margin-top:0.5rem; padding:0.4rem; background:var(--bg-main); border-radius:4px; font-size:0.75rem; color:var(--text-muted);"></div>
           </div>
         </div>
 
         <!-- Machine Operator Blade Stops Ruler -->
         <div class="card operator-only">
           <div class="card-header">
-            <div class="card-title">
-              <span>📏</span> Machine Operator Setup Sheet (Knife Stop Coordinates)
-            </div>
+            <div class="card-title"><span>📏</span> Operator Setup Sheet — Knife Stops</div>
             <span class="badge badge-success">Lock Knives Before Run</span>
           </div>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:0.4rem;">
-              Lock bottom shear knives / razor holders at the following millimeter positions across the drive shaft:
+            <p style="font-size:0.75rem; color:var(--text-muted); margin:0.4rem 0.85rem 0.3rem;">
+              Lock bottom shear knives / razor holders at the following mm positions across the drive shaft:
             </p>
-
             <div class="table-responsive">
               <table class="blade-table">
                 <thead>
                   <tr>
-                    <th style="width:40px;">Knife</th>
-                    <th style="width:40px;">Reel</th>
-                    <th>Knife Stop Mark</th>
+                    <th style="width:38px;">Knife</th>
+                    <th style="width:38px;">Reel</th>
+                    <th>Stop Mark</th>
                     <th>Cut Width</th>
                     <th>Reel Wt</th>
-                    <th>Length / Cycle</th>
+                    <th>Length/Cycle</th>
                     <th>Rewind Shaft</th>
                   </tr>
                 </thead>
-                <tbody id="bladeStopsTableBody">
-                  <!-- Populated dynamically -->
-                </tbody>
+                <tbody id="bladeStopsTableBody"></tbody>
               </table>
             </div>
 
-            <div class="print-only" style="margin-top:2cm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:2rem; font-size:9pt;">
+            <div class="print-only" style="margin-top:2cm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:2rem; font-size:9pt; padding:0 0.85rem 0.85rem;">
               <div style="border-top:1px solid #000; padding-top:4px;"><strong>Operator Signature:</strong></div>
               <div style="border-top:1px solid #000; padding-top:4px;"><strong>QA Inspector:</strong></div>
-              <div style="border-top:1px solid #000; padding-top:4px;"><strong>Production Manager Approval:</strong></div>
+              <div style="border-top:1px solid #000; padding-top:4px;"><strong>Production Manager:</strong></div>
             </div>
-
-          </div>
         </div>
 
-      </div>
-
-    </div>
+    </div><!-- end .main-grid -->
 
   <!-- DEDICATED CLEAN OPERATOR PRINT SHEET (Visible ONLY when printing) -->
   <div id="operatorPrintSheet" class="operator-print-sheet">
