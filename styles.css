@@ -303,6 +303,11 @@ header {
   align-items: start;
 }
 
+/* Let grid columns shrink so wide tables scroll inside their cards instead of widening the page */
+.main-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 1024px) {
   .main-grid {
     grid-template-columns: 1fr;
