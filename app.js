@@ -442,19 +442,16 @@ function renderOrdersTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>
-        <span style="display:inline-block; width:12px; height:12px; border-radius:2px; background:${getColorForWidth(order.width)}; margin-right:6px; vertical-align:middle;"></span>
-        <strong>#${index + 1}</strong>
+      <td class="order-num">
+        <span class="order-swatch" style="background:${getColorForWidth(order.width)};"></span>${index + 1}
       </td>
       <td>
-        <input type="number" step="0.5" min="1" value="${order.width}" data-field="width" data-id="${order.id}" class="row-input" style="width:80px"> mm
+        <input type="number" step="0.5" min="1" value="${order.width}" data-field="width" data-id="${order.id}" class="row-input" aria-label="Cut width ${index + 1} in mm">
       </td>
       <td>
-        <input type="number" step="1" min="1" value="${order.targetKg}" data-field="targetKg" data-id="${order.id}" class="row-input" style="width:90px"> kg
+        <input type="number" step="1" min="1" value="${order.targetKg}" data-field="targetKg" data-id="${order.id}" class="row-input" aria-label="Target weight ${index + 1} in kg">
       </td>
-      <td>
-        ${isBelowMin ? `<span class="badge badge-danger">⚠️ &lt; ${state.master.minSlitWidth}mm (Impossible)</span>` : `<span class="badge badge-success">✓ Feasible</span>`}
-      </td>
+      <td class="order-status">${feasibilityIcon(order)}</td>
       <td style="text-align:right">
         <button class="btn-del-row" data-id="${order.id}" title="Remove cut">✕</button>
       </td>
@@ -504,6 +501,15 @@ function renderOrdersTable() {
 }
 
 /**
+ * Compact per-row status: a tick, or a warning when the cut is below the minimum slit width
+ */
+function feasibilityIcon(order) {
+  return order.width < state.master.minSlitWidth
+    ? `<span class="status-bad" title="Below ${state.master.minSlitWidth} mm minimum slit width">⚠</span>`
+    : `<span class="status-ok" title="Feasible">✓</span>`;
+}
+
+/**
  * Refreshes the total kg, per-row feasibility badges and the min-width alert in place
  */
 function updateOrdersSummary() {
@@ -519,9 +525,7 @@ function updateOrdersSummary() {
     const order = state.orders[i];
     const cell = tr.children[3];
     if (!order || !cell) return;
-    cell.innerHTML = order.width < state.master.minSlitWidth
-      ? `<span class="badge badge-danger">⚠️ &lt; ${state.master.minSlitWidth}mm (Impossible)</span>`
-      : `<span class="badge badge-success">✓ Feasible</span>`;
+    cell.innerHTML = feasibilityIcon(order);
   });
 
   // Update order feasibility warning banner
@@ -980,7 +984,6 @@ function renderAll() {
   renderKPIRibbon();
   renderRecipeCards();
   renderRollVisualizer();
-  renderBladeStopsTable();
   renderComparisonTable();
   renderRollSetsTable();
   renderPrintJobCard();
@@ -1208,60 +1211,6 @@ function renderRollVisualizer() {
   }
 }
 
-function renderBladeStopsTable() {
-  if (!state.selectedSolution) return;
-  const d = state.selectedSolution.data;
-  const tbody = document.getElementById('bladeStopsTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  let currentStop = 0;
-  let knifeIndex = 1;
-
-  // Blade 0 / Left Trim Stop
-  currentStop += d.trimLeft;
-
-  let reelIndex = 1;
-  d.cutsMap.forEach(cut => {
-    for (let i = 0; i < cut.count; i++) {
-      const nextStop = currentStop + cut.width;
-      const singleReelKg = +(state.master.weightKg * (cut.width / state.master.widthMm)).toFixed(1);
-      const isTop = (knifeIndex % 2 === 1);
-      const shaftBadge = isTop
-        ? `<span class="shaft-badge shaft-top">Top Shaft</span>`
-        : `<span class="shaft-badge shaft-bottom">Bottom Shaft</span>`;
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="color:var(--text-muted); font-weight:700;">#${knifeIndex}</td>
-        <td><strong>R${reelIndex}</strong></td>
-        <td><span style="font-family:var(--font-mono); font-weight:700; color:var(--accent-blue); white-space:nowrap;">${currentStop.toFixed(1)} &rarr; ${nextStop.toFixed(1)} mm</span></td>
-        <td><span class="badge badge-info" style="padding:1px 6px;">${cut.width} mm</span></td>
-        <td><strong style="white-space:nowrap;">${singleReelKg} kg</strong></td>
-        <td><span style="color:var(--text-muted); font-size:0.75rem; white-space:nowrap;">${state.master.uniformCycleMeters.toLocaleString()} m</span></td>
-        <td>${shaftBadge}</td>
-      `;
-      tbody.appendChild(tr);
-
-      currentStop = nextStop;
-      knifeIndex++;
-      reelIndex++;
-    }
-  });
-
-  // Final trim summary row
-  const trTrim = document.createElement('tr');
-  trTrim.style.background = 'rgba(239, 68, 68, 0.08)';
-  trTrim.innerHTML = `
-    <td colspan="2"><strong style="color:var(--accent-red)">Edge Trim</strong></td>
-    <td colspan="2"><span style="white-space:nowrap;"><strong>${d.trimWidth.toFixed(1)} mm</strong> on one side only</span></td>
-    <td><strong>${d.scrapKg} kg</strong></td>
-    <td><span style="color:var(--text-muted); font-size:0.75rem;">${d.scrapPct}% waste</span></td>
-    <td><span class="badge badge-danger" style="padding:1px 6px;">Edge Blower</span></td>
-  `;
-  tbody.appendChild(trTrim);
-}
-
 function renderComparisonTable() {
   if (!state.selectedSolution) return;
   const d = state.selectedSolution.data;
@@ -1324,46 +1273,6 @@ function renderPrintJobCard() {
   } else {
     materialDesc = `Paper / Board | ${state.master.paperGsm} GSM (Tester) | Caliper: ${state.master.paperThicknessMicrons} µm`;
   }
-
-  // Generate Knife Setup Ruler Rows
-  let currentStop = d.trimLeft;
-  let knifeIndex = 1;
-  let reelIndex = 1;
-  let bladeRowsHtml = '';
-
-  d.cutsMap.forEach(cut => {
-    for (let i = 0; i < cut.count; i++) {
-      const nextStop = currentStop + cut.width;
-      const isTopShaft = (knifeIndex % 2 === 1);
-      const shaftName = isTopShaft ? 'TOP REWIND SHAFT' : 'BOTTOM REWIND SHAFT';
-      const singleRollKg = +(setMeters * (cut.width / 1000) * (state.master.gsm / 1000)).toFixed(2);
-      const totalCutRolls = cut.count * totalSets;
-
-      bladeRowsHtml += `
-        <tr>
-          <td style="text-align:center; font-weight:700;">#${knifeIndex}</td>
-          <td style="text-align:center;">Reel #${reelIndex}</td>
-          <td style="font-weight:700; font-family:var(--font-mono); font-size:9pt; color:#1F3C88;">
-            ${currentStop.toFixed(1)} mm &rarr; ${nextStop.toFixed(1)} mm
-          </td>
-          <td style="text-align:center; font-weight:800; font-size:9.5pt; color:#1F3C88;">
-            ${cut.width} mm
-          </td>
-          <td style="font-weight:600; text-align:center; ${isTopShaft ? 'background:#f0f4fc; color:#1F3C88;' : 'background:#f4fbf7; color:#0e6245;'}">
-            ${shaftName}
-          </td>
-          <td style="text-align:center;">1 roll / cycle</td>
-          <td style="text-align:center; font-weight:700;">${totalSets} rolls</td>
-          <td style="text-align:right;">${singleRollKg} kg</td>
-          <td style="text-align:center;">[ &nbsp; ]</td>
-        </tr>
-      `;
-
-      currentStop = nextStop;
-      knifeIndex++;
-      reelIndex++;
-    }
-  });
 
   // Generate Packaging Manifest Rows
   let manifestRowsHtml = '';
@@ -1437,46 +1346,9 @@ function renderPrintJobCard() {
       <div><strong>Estimated Job Time:</strong> ${state.master.estTimeStr}</div>
     </div>
 
-    <!-- KNIFE STOP SETUP RULER TABLE (OPERATOR GUIDE) -->
-    <div class="print-section-title">
-      <span>1. Machine Blade Setup Ruler (Lock Knives At mm Positions Across Shaft)</span>
-      <span style="font-size:7.5pt; font-weight:600; color:#555;">Zero Changeover &bull; Total Knives: ${d.totalBlades} &bull; Web Span: ${d.cutsWidth} mm</span>
-    </div>
-
-    <table class="print-table">
-      <thead>
-        <tr>
-          <th style="width:45px; text-align:center;">Knife #</th>
-          <th style="width:55px; text-align:center;">Reel #</th>
-          <th style="width:165px;">Position Stop Marks (mm)</th>
-          <th style="width:75px; text-align:center;">Slit Width</th>
-          <th style="width:170px; text-align:center;">Rewind Shaft Assignment</th>
-          <th style="width:85px; text-align:center;">Rolls / Cycle</th>
-          <th style="width:90px; text-align:center;">Total FG Reels</th>
-          <th style="width:85px; text-align:right;">Single Reel Wt</th>
-          <th style="width:50px; text-align:center;">Locked</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${bladeRowsHtml}
-        <!-- Edge Trim (all on one side) -->
-        <tr style="background:#fff3f3;">
-          <td style="text-align:center; font-weight:700;">-</td>
-          <td style="text-align:center;">Edge Trim</td>
-          <td style="font-family:var(--font-mono); font-size:8pt; color:#b91c1c;">${d.cutsWidth.toFixed(1)} mm &rarr; ${(d.effectiveRollWidth || state.master.widthMm).toFixed(1)} mm</td>
-          <td style="text-align:center; color:#b91c1c; font-weight:700;">${d.trimRight} mm</td>
-          <td style="text-align:center; color:#777; font-size:7.5pt;">Edge Trim Blower / Suction</td>
-          <td style="text-align:center;">-</td>
-          <td style="text-align:center;">-</td>
-          <td style="text-align:right; color:#b91c1c;">Scrap</td>
-          <td style="text-align:center;">✓</td>
-        </tr>
-      </tbody>
-    </table>
-
     <!-- PACKAGING & DELIVERY MANIFEST -->
     <div class="print-section-title">
-      <span>2. Finished Goods Packaging & Delivery Manifest</span>
+      <span>1. Finished Goods Packaging & Delivery Manifest</span>
       <span style="font-size:7.5pt; font-weight:600; color:#555;">Total Finished Reels: ${grandTotalRolls} &bull; Target OD: ${resultingOd}"</span>
     </div>
 

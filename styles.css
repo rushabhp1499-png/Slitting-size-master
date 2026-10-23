@@ -467,6 +467,7 @@ body.results-stale .kpi-grid {
 /* Orders Table */
 .order-table {
   width: 100%;
+  table-layout: fixed; /* columns share the panel width, never wider than it */
   border-collapse: collapse;
   font-size: 0.85rem;
   margin-bottom: 0.75rem;
@@ -498,6 +499,34 @@ body.results-stale .kpi-grid {
   font-size: 0.85rem;
   width: 100%;
 }
+
+.order-table th,
+.order-table td {
+  padding-left: 0.3rem;
+  padding-right: 0.3rem;
+}
+
+.order-num {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.order-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.order-status {
+  text-align: center;
+  font-weight: 800;
+}
+
+.status-ok { color: var(--accent-green); }
+.status-bad { color: var(--accent-red); cursor: help; }
 
 .btn-del-row {
   background: transparent;

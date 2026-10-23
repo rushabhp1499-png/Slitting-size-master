@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <!-- Bump ?v= on every release so browsers fetch the new files instead of a cached copy -->
-  <link rel="stylesheet" href="styles.css?v=2026-10-23-2">
+  <link rel="stylesheet" href="styles.css?v=2026-10-23-3">
 </head>
 <body>
 
@@ -261,15 +261,22 @@
             <div id="calcErrorBanner" class="alert alert-danger" style="display:none;"></div>
             <div id="feasibilityBanner" style="display:none;"></div>
 
-            <div class="table-responsive">
+            <div>
               <table class="order-table">
+                <colgroup>
+                  <col style="width:2.6rem;">
+                  <col>
+                  <col>
+                  <col style="width:1.8rem;">
+                  <col style="width:2rem;">
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style="width:32px;">#</th>
-                    <th>Cut Width</th>
-                    <th>Target Wt</th>
-                    <th>Feasibility</th>
-                    <th style="width:28px;"></th>
+                    <th>#</th>
+                    <th>Width (mm)</th>
+                    <th>Weight (kg)</th>
+                    <th></th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody id="ordersTableBody">
@@ -409,39 +416,6 @@
           </div>
         </div>
 
-        <!-- Machine Operator Blade Stops Ruler -->
-        <div class="card operator-only">
-          <div class="card-header">
-            <div class="card-title"><span>📏</span> Operator Setup Sheet — Knife Stops</div>
-            <span class="badge badge-success">Lock Knives Before Run</span>
-          </div>
-            <p style="font-size:0.75rem; color:var(--text-muted); margin:0.4rem 0.85rem 0.3rem;">
-              Lock bottom shear knives / razor holders at the following mm positions across the drive shaft:
-            </p>
-            <div class="table-responsive">
-              <table class="blade-table">
-                <thead>
-                  <tr>
-                    <th style="width:38px;">Knife</th>
-                    <th style="width:38px;">Reel</th>
-                    <th>Stop Mark</th>
-                    <th>Cut Width</th>
-                    <th>Reel Wt</th>
-                    <th>Length/Cycle</th>
-                    <th>Rewind Shaft</th>
-                  </tr>
-                </thead>
-                <tbody id="bladeStopsTableBody"></tbody>
-              </table>
-            </div>
-
-            <div class="print-only" style="margin-top:2cm; display:grid; grid-template-columns:1fr 1fr 1fr; gap:2rem; font-size:9pt; padding:0 0.85rem 0.85rem;">
-              <div style="border-top:1px solid #000; padding-top:4px;"><strong>Operator Signature:</strong></div>
-              <div style="border-top:1px solid #000; padding-top:4px;"><strong>QA Inspector:</strong></div>
-              <div style="border-top:1px solid #000; padding-top:4px;"><strong>Production Manager:</strong></div>
-            </div>
-        </div>
-
       </div><!-- end .right-panel -->
 
     </div><!-- end .main-grid -->
@@ -454,6 +428,6 @@
   </div>
 
   <!-- Core JavaScript -->
-  <script src="app.js?v=2026-10-23-2"></script>
+  <script src="app.js?v=2026-10-23-3"></script>
 </body>
 </html>
