@@ -980,139 +980,214 @@ body.customer-mode .customer-quote-banner {
     display: none !important;
   }
 
+  /* Job card: landscape A4, black & white only */
   @page {
-    size: A4 portrait;
+    size: A4 landscape;
     margin: 8mm;
   }
 
   body {
-    background: #ffffff !important;
-    color: #000000 !important;
+    background: #fff !important;
+    color: #000 !important;
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 9pt;
-    line-height: 1.35;
-  }
-
-  .print-table tr {
-    page-break-inside: avoid;
+    font-size: 10pt;
+    line-height: 1.3;
   }
 
   .operator-print-sheet {
     display: block !important;
-    padding: 0.6cm 0.8cm !important;
-    max-width: 100% !important;
-    margin: 0 auto !important;
-  }
-
-  .print-header-box {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 2px solid #1F3C88;
-    padding-bottom: 8px;
-    margin-bottom: 10px;
-  }
-
-  .print-header-logo {
-    height: 48px;
-    width: auto;
-  }
-
-  .print-title {
-    font-size: 15pt;
-    font-weight: 800;
-    color: #1F3C88;
-    margin: 0;
-    text-transform: uppercase;
-  }
-
-  .print-meta-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px 8px;
-    border: 1px solid #777;
-    background: #f7f9fc !important;
-    padding: 6px 10px;
-    margin-bottom: 12px;
-    font-size: 8.5pt;
-  }
-
-  .print-directive-box {
-    border: 2px solid #F36F21;
-    background: #fff8f4 !important;
-    padding: 8px 12px;
-    margin-bottom: 12px;
-    text-align: center;
-    border-radius: 4px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-directive-heading {
-    font-size: 13pt;
-    font-weight: 800;
-    color: #F36F21;
-    margin-bottom: 3px;
-    letter-spacing: -0.01em;
-  }
-
-  .print-directive-sub {
-    font-size: 8.5pt;
-    font-weight: 600;
-    color: #111;
-  }
-
-  .print-table {
     width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 12px;
-    font-size: 8pt;
+    color: #000;
   }
 
-  .print-table th {
-    background: #eef2f7 !important;
-    color: #111 !important;
-    border: 1px solid #666 !important;
-    padding: 4px 6px;
-    text-align: left;
-    font-weight: 700;
-    font-size: 7.8pt;
-    text-transform: uppercase;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .print-table td {
-    border: 1px solid #777 !important;
-    padding: 3.5px 6px;
-    color: #000 !important;
-  }
-
-  .print-section-title {
-    font-size: 9.5pt;
-    font-weight: 700;
-    color: #1F3C88;
-    margin-bottom: 4px;
-    text-transform: uppercase;
+  .jc-header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
+    border-bottom: 2px solid #000;
+    padding-bottom: 2mm;
+    margin-bottom: 3mm;
   }
 
-  .print-signatures {
-    margin-top: 14px;
+  .jc-logo {
+    height: 11mm;
+    width: auto;
+    filter: grayscale(1);
+  }
+
+  .jc-title {
+    font-size: 20pt;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .jc-date {
+    font-size: 10pt;
+  }
+
+  .jc-details {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px;
-    font-size: 8pt;
+    grid-template-columns: 1.2fr 1.4fr 1fr 1fr;
+    gap: 4mm;
+    font-size: 11pt;
+    margin-bottom: 3mm;
+  }
+
+  .jc-blank {
+    display: inline-block;
+    min-width: 45mm;
+    border-bottom: 1px solid #000;
+    height: 1em;
+    vertical-align: bottom;
+  }
+
+  .jc-blank.short {
+    min-width: 25mm;
+  }
+
+  .jc-specs {
+    display: grid;
+    grid-template-columns: 1.6fr 1.4fr 1fr 1fr 0.7fr 0.7fr 1fr;
+    border: 1px solid #000;
+    margin-bottom: 4mm;
+  }
+
+  .jc-specs > div {
+    padding: 1.5mm 2.5mm;
+    border-right: 1px solid #000;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .jc-specs > div:last-child {
+    border-right: none;
+  }
+
+  .jc-specs span {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .jc-specs strong {
+    font-size: 11pt;
+  }
+
+  .jc-section-title {
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-bottom: 1.5mm;
+  }
+
+  .jc-section-title span {
+    font-weight: 400;
+    text-transform: none;
+    font-size: 8.5pt;
+  }
+
+  /* The cross-section spans the full printable width */
+  .jc-roll {
+    display: flex;
+    width: 100%;
+    height: 38mm;
+    border: 1.5px solid #000;
     page-break-inside: avoid;
   }
 
-  .sign-line {
-    border-top: 1px solid #444;
-    padding-top: 4px;
-    font-weight: 600;
+  .jc-strip {
+    height: 100%;
+    border-right: 1px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .jc-strip:last-child {
+    border-right: none;
+  }
+
+  .jc-vertical {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
+  /* Trim: black diagonal cross-hatch (forced to print) */
+  .jc-trim {
+    background-color: #fff !important;
+    background-image: repeating-linear-gradient(45deg, #000 0, #000 0.7px, transparent 0.7px, transparent 3.5px),
+                      repeating-linear-gradient(-45deg, #000 0, #000 0.7px, transparent 0.7px, transparent 3.5px) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .jc-trim span {
+    background: #fff;
+    padding: 1px 0;
+  }
+
+  .jc-ruler {
+    display: flex;
+    justify-content: space-between;
+    font-size: 8pt;
+    margin: 1mm 0 4mm;
+  }
+
+  .jc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin-bottom: 3mm;
+  }
+
+  .jc-table th,
+  .jc-table td {
+    border: 1px solid #000;
+    padding: 0.6mm 2.5mm;
+    text-align: left;
+  }
+
+  .jc-table th {
+    font-size: 8.5pt;
+    text-transform: uppercase;
+  }
+
+  .jc-table .num {
+    text-align: right;
+  }
+
+  .jc-table tr {
+    page-break-inside: avoid;
+  }
+
+  .jc-size {
+    font-weight: 800;
+  }
+
+  .jc-total td {
+    font-weight: 800;
+    border-top: 2px solid #000;
+  }
+
+  .jc-signoff {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30mm;
+    margin-top: 9mm;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+
+  .jc-signoff > div {
+    border-top: 1px solid #000;
+    padding-top: 1.5mm;
   }
 }
 

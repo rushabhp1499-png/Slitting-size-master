@@ -50,6 +50,7 @@ const state = {
     { id: 8, width: 45,  targetKg: 100 },
     { id: 9, width: 35,  targetKg: 80 }
   ],
+  jobCard: { machineNo: '', operatorName: '' }, // printed on the job card
   solutions: [],
   selectedSolution: null,
   customBlades: {} // manual fine-tuning map: { width: count }
@@ -194,6 +195,15 @@ function initUI() {
       markResultsStale();
     });
   }
+
+  // Job card details: printed as typed (no recalculation needed)
+  [['machineNoInput', 'machineNo'], ['operatorNameInput', 'operatorName']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    el?.addEventListener('input', () => {
+      state.jobCard[key] = el.value.trim();
+      renderPrintJobCard();
+    });
+  });
 
   // Film type is a free-text label (only shown on the job card, so no recalculation needed)
   const filmTypeInput = document.getElementById('filmTypeInput');
@@ -1253,151 +1263,118 @@ function renderPrintJobCard() {
   const setMeters = state.master.uniformCycleMeters;
   const resultingOd = state.master.resultingOdInch;
   const coreDia = state.master.coreDiaInch;
+  const rollWidth = d.effectiveRollWidth || state.master.widthMm;
 
-  const dateStr = new Date().toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-  });
+  const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
-  let materialDesc = '';
-  if (isPlastic) {
-    const pName = `${state.master.filmName || 'Polyester'} Film`;
-    materialDesc = `${pName} | ${state.master.thicknessMicrons} µm | Density: ${state.master.density} g/cm³ (${state.master.gsm} GSM)`;
-  } else {
-    materialDesc = `Paper / Board | ${state.master.paperGsm} GSM (Tester) | Caliper: ${state.master.paperThicknessMicrons} µm`;
-  }
+  const material = isPlastic
+    ? `${escapeHtml(state.master.filmName || 'Polyester')} Film, ${state.master.thicknessMicrons} µm`
+    : `Paper / Board, ${state.master.paperThicknessMicrons} µm`;
 
-  // Generate Packaging Manifest Rows
-  let manifestRowsHtml = '';
-  let grandTotalRolls = 0;
+  // A filled value, or a blank line to write on by hand
+  const fillIn = (value) => value ? `<strong>${escapeHtml(value)}</strong>` : '<span class="jc-blank"></span>';
 
+  // ── Cross-section: strips sized for the landscape A4 width (281 mm printable) ──
+  const PRINT_WIDTH_PT = 281 * 2.835; // mm -> pt
+  const strips = [];
   d.cutsMap.forEach(cut => {
+    for (let i = 0; i < cut.count; i++) strips.push({ width: cut.width, label: `${cut.width}`, trim: false });
+  });
+  if (d.trimRight > 0) strips.push({ width: d.trimRight, label: `${d.trimRight}`, trim: true });
+
+  const stripsHtml = strips.map(s => {
+    const stripPt = (s.width / rollWidth) * PRINT_WIDTH_PT;
+    // Horizontal 13pt bold needs about 0.62em per character + padding; otherwise write it vertically
+    const fitsFlat = stripPt - 6 >= s.label.length * 0.62 * 13;
+    const fontPt = fitsFlat ? 13 : Math.max(5, Math.min(12, stripPt - 1.5));
+    // A thin trim is just hatching (its width is printed in the specs row)
+    const label = s.trim && stripPt < 9 ? ''
+      : `<span class="${fitsFlat ? '' : 'jc-vertical'}" style="font-size:${fontPt.toFixed(1)}pt">${s.label}</span>`;
+    return `<div class="jc-strip${s.trim ? ' jc-trim' : ''}" style="width:${(s.width / rollWidth) * 100}%">${label}</div>`;
+  }).join('');
+
+  // ── Size table (no packaging spec column) ──
+  let grandTotalRolls = 0;
+  const rowsHtml = d.cutsMap.filter(c => c.count > 0).map(cut => {
     const totalRolls = cut.count * totalSets;
     grandTotalRolls += totalRolls;
-    const singleRollKg = +(setMeters * (cut.width / 1000) * (state.master.gsm / 1000)).toFixed(2);
-    const diffSign = cut.diffKg >= 0 ? `+${cut.diffKg}` : `${cut.diffKg}`;
-
-    manifestRowsHtml += `
+    const kgPerRoll = +(setMeters * (cut.width / 1000) * (state.master.gsm / 1000)).toFixed(2);
+    const diff = cut.diffKg >= 0 ? `+${cut.diffKg}` : `${cut.diffKg}`;
+    return `
       <tr>
-        <td style="font-weight:800; font-size:9.5pt; color:#1F3C88;">${cut.width} mm</td>
-        <td style="text-align:center; font-weight:700;">${cut.count} cuts</td>
-        <td style="text-align:right;">${cut.targetKg} kg</td>
-        <td style="text-align:right; font-weight:700;">${cut.producedKg} kg</td>
-        <td style="text-align:right; font-size:8pt;">${diffSign} kg (${cut.pctDiff}%)</td>
-        <td style="text-align:center; font-weight:800; color:#F36F21; font-size:9.5pt;">${totalRolls} Rolls</td>
-        <td style="text-align:right;">${singleRollKg} kg / roll</td>
-        <td style="text-align:center;">${coreDia}" Core &times; ${resultingOd}" OD</td>
-      </tr>
-    `;
-  });
+        <td class="jc-size">${cut.width} mm</td>
+        <td class="num">${cut.count}</td>
+        <td class="num">${cut.targetKg}</td>
+        <td class="num">${cut.producedKg}</td>
+        <td class="num">${diff}</td>
+        <td class="num"><strong>${totalRolls}</strong></td>
+        <td class="num">${kgPerRoll}</td>
+      </tr>`;
+  }).join('');
 
   sheet.innerHTML = `
-    <!-- PRINT HEADER -->
-    <div class="print-header-box">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <img src="logo.png" alt="Progressive Enterprises" class="print-header-logo">
-        <div>
-          <div style="font-size:14pt; font-weight:800; color:#1F3C88; text-transform:uppercase; letter-spacing:-0.02em;">
-            Progressive Enterprises
-          </div>
-          <div style="font-size:8pt; color:#555; font-weight:600;">
-            Machine Operator Production Job Card &bull; Single-Setup Zero-Blade-Changeover Run
-          </div>
-        </div>
-      </div>
-      <div style="text-align:right; font-size:8pt; line-height:1.4;">
-        <div><strong>Print Date:</strong> ${dateStr}</div>
-        <div><strong>Shift:</strong> ______________</div>
-        <div><strong>Machine No:</strong> SLIT-01</div>
-      </div>
+    <div class="jc-header">
+      <img src="logo.png" alt="Progressive Enterprises" class="jc-logo">
+      <div class="jc-title">Job Card</div>
+      <div class="jc-date">Date: <strong>${dateStr}</strong></div>
     </div>
 
-    <!-- MANDATORY OPERATOR ACTION DIRECTIVE BOX -->
-    <div class="print-directive-box">
-      <div class="print-directive-heading">
-        ⚡ MANDATORY OPERATOR ACTION: RUN ${totalSets} CYCLES OF EXACTLY ${setMeters.toLocaleString()} METERS EACH
-      </div>
-      <div class="print-directive-sub">
-        Finished Roll Specification: <strong>${resultingOd}" OD</strong> on <strong>${coreDia}" Paper Tube Core</strong> &bull; 
-        <strong>100% UNIFORM OD &bull; ZERO STUB / MIX-AND-MATCH ROLLS</strong> &bull; Lock all ${d.totalBlades} Blades ONCE!
-      </div>
+    <div class="jc-details">
+      <div>Machine No: ${fillIn(state.jobCard.machineNo)}</div>
+      <div>Operator: ${fillIn(state.jobCard.operatorName)}</div>
+      <div>Start Time: <span class="jc-blank short"></span></div>
+      <div>End Time: <span class="jc-blank short"></span></div>
     </div>
 
-    <!-- MASTER ROLL & JOB SPECIFICATIONS GRID -->
-    <div class="print-meta-grid">
-      <div><strong>Material Type:</strong> ${isPlastic ? 'Plastic Film' : 'Paper / Board'}</div>
-      <div><strong>Substrate Specs:</strong> ${materialDesc}</div>
-      <div><strong>Master Roll Width:</strong> ${state.master.widthMm} mm (±${state.master.parentTolMm}mm tol)</div>
-      <div><strong>Tolerance Status:</strong> ${d.totalBlades > 12 ? (d.usedTolMm > 0 ? `+${d.usedTolMm}mm Active` : 'Active (>12 blades)') : 'Locked (<=12 blades)'}</div>
-      <div><strong>Master Gross Weight:</strong> ${state.master.weightKg} kg</div>
-      <div><strong>Total Linear Web:</strong> ${state.master.linearMeters.toLocaleString()} running meters</div>
-      <div><strong>Finished Goods Yield:</strong> ${d.fgKg} kg (${((d.fgKg/state.master.weightKg)*100).toFixed(1)}%)</div>
-      <div><strong>Edge Offcut Scrap:</strong> ${d.scrapKg} kg (${d.scrapPct}%) | Trim ${d.trimWidth.toFixed(1)} mm on one side</div>
-      <div><strong>Slitter Speed:</strong> ${state.master.machineSpeed} m/min</div>
-      <div><strong>Total Machine Rounds:</strong> ${totalSets} Uniform Cycles</div>
-      <div><strong>Rewind Core:</strong> ${coreDia}" Paper Tube (${(coreDia * 25.4).toFixed(1)} mm ID)</div>
-      <div><strong>Estimated Job Time:</strong> ${state.master.estTimeStr}</div>
+    <div class="jc-specs">
+      <div><span>Material</span><strong>${material}</strong></div>
+      <div><span>Master Roll</span><strong>${state.master.widthMm} mm &times; ${state.master.weightKg} kg</strong></div>
+      <div><span>Core / OD</span><strong>${coreDia}" / ${resultingOd}"</strong></div>
+      <div><span>Length per Roll</span><strong>${setMeters.toLocaleString()} m</strong></div>
+      <div><span>Rounds</span><strong>${totalSets}</strong></div>
+      <div><span>Knives</span><strong>${d.totalBlades}</strong></div>
+      <div><span>Trim (one side)</span><strong>${d.trimWidth.toFixed(1)} mm</strong></div>
     </div>
 
-    <!-- PACKAGING & DELIVERY MANIFEST -->
-    <div class="print-section-title">
-      <span>1. Finished Goods Packaging & Delivery Manifest</span>
-      <span style="font-size:7.5pt; font-weight:600; color:#555;">Total Finished Reels: ${grandTotalRolls} &bull; Target OD: ${resultingOd}"</span>
+    <div class="jc-section-title">Master Roll Cross-Section <span>(sizes in mm, left to right; hatched = trim)</span></div>
+    <div class="jc-roll">${stripsHtml}</div>
+    <div class="jc-ruler">
+      <span>0</span><span>${Math.round(rollWidth / 2)} mm</span><span>${rollWidth} mm</span>
     </div>
 
-    <table class="print-table">
+    <table class="jc-table">
       <thead>
         <tr>
           <th>Slit Size</th>
-          <th style="text-align:center;">Blades Locked</th>
-          <th style="text-align:right;">Target Order Wt</th>
-          <th style="text-align:right;">Produced FG Wt</th>
-          <th style="text-align:right;">Variance (Δ)</th>
-          <th style="text-align:center;">Total Rolls to Pack</th>
-          <th style="text-align:right;">Single Roll Wt</th>
-          <th style="text-align:center;">Packaging Spec</th>
+          <th class="num">Knives</th>
+          <th class="num">Ordered (kg)</th>
+          <th class="num">Produced (kg)</th>
+          <th class="num">Difference (kg)</th>
+          <th class="num">Total Rolls</th>
+          <th class="num">Kg per Roll</th>
         </tr>
       </thead>
       <tbody>
-        ${manifestRowsHtml}
-        <tr style="background:#f7f9fc; font-weight:700;">
-          <td>TOTALS</td>
-          <td style="text-align:center;">${d.totalBlades} Blades</td>
-          <td style="text-align:right;">${state.orders.reduce((s,o)=>s+o.targetKg,0).toFixed(1)} kg</td>
-          <td style="text-align:right; color:#1F3C88;">${d.fgKg} kg</td>
-          <td style="text-align:right;">Yield: ${((d.fgKg/state.master.weightKg)*100).toFixed(1)}%</td>
-          <td style="text-align:center; color:#F36F21; font-size:9.5pt;">${grandTotalRolls} Finished Reels</td>
-          <td style="text-align:right;">Uniform OD</td>
-          <td style="text-align:center;">100% Uniform ${resultingOd}" OD</td>
+        ${rowsHtml}
+        <tr class="jc-total">
+          <td>Total</td>
+          <td class="num">${d.totalBlades}</td>
+          <td class="num">${state.orders.reduce((s, o) => s + o.targetKg, 0).toFixed(1)}</td>
+          <td class="num">${d.fgKg}</td>
+          <td class="num"></td>
+          <td class="num">${grandTotalRolls}</td>
+          <td class="num"></td>
         </tr>
       </tbody>
     </table>
 
-    <!-- OPERATOR PRE-RUN CHECKLIST & SIGN-OFFS -->
-    <div style="display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; margin-top:8px; page-break-inside:avoid;">
-      <div style="border:1px solid #777; padding:6px 10px; background:#fafafa; font-size:8pt; border-radius:3px;">
-        <div style="font-weight:700; color:#1F3C88; margin-bottom:4px; text-transform:uppercase;">
-          Operator Pre-Run Quality Checklist
-        </div>
-        <div style="line-height:1.55;">
-          <div>[ &nbsp; ] Master roll centered & web aligned with unwind edge-guide</div>
-          <div>[ &nbsp; ] All ${d.totalBlades} bottom shear knives & top razor blades locked tight to ruler stops</div>
-          <div>[ &nbsp; ] Core spacers placed on Top and Bottom shafts (alternating layout)</div>
-          <div>[ &nbsp; ] Meter counter calibrated and reset to <strong>0000 m</strong></div>
-          <div>[ &nbsp; ] Digital stop programmed to trip at <strong>${setMeters.toLocaleString()} m</strong> per cycle</div>
-        </div>
-      </div>
-
-      <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:8pt;">
-        <div class="sign-line" style="margin-bottom:6px;">
-          <strong>Machine Operator Signature:</strong> ______________________ (Emp ID: _______)
-        </div>
-        <div class="sign-line" style="margin-bottom:6px;">
-          <strong>QA Inspector Roll OD Verification:</strong> ________________ (Measured OD: ____")
-        </div>
-        <div class="sign-line">
-          <strong>Production Manager Final Sign-Off:</strong> ________________ (Date: ___________)
-        </div>
-      </div>
+    <div class="jc-signoff">
+      <div>Operator Signature</div>
+      <div>Production Manager Approval</div>
     </div>
   `;
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
