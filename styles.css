@@ -381,9 +381,26 @@ body.results-stale .kpi-grid {
   min-width: 0;
 }
 
-@media (max-width: 1024px) {
+/* iPad landscape / small laptops: keep two columns with a narrower input column */
+@media (max-width: 1279px) {
+  .main-grid {
+    grid-template-columns: 340px 1fr;
+  }
+  .roll-fields-row {
+    grid-template-columns: 1fr 1fr; /* Core | OD, then Length | Rounds */
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(3, 1fr); /* six figures as an even 3 + 3 */
+  }
+}
+
+/* iPad portrait and phones: one column (inputs first, then results) */
+@media (max-width: 899px) {
   .main-grid {
     grid-template-columns: 1fr;
+  }
+  .roll-fields-row {
+    grid-template-columns: 0.8fr 1fr 1.2fr 1fr;
   }
 }
 
@@ -1238,4 +1255,165 @@ body.customer-mode .customer-quote-banner {
 
 .print-only {
   display: none;
+}
+
+/* Top-to-bottom roll (phones): built by renderVerticalRoll() */
+.roll-schematic.roll-vertical {
+  flex-direction: column;
+  width: 100%;
+}
+
+.roll-vertical .roll-segment {
+  width: 100% !important;
+  border-right: none;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.55);
+}
+
+.roll-vertical .segment-trim {
+  min-height: 26px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.roll-vertical .seg-label {
+  font-size: 1.05rem;
+  padding: 2px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+}
+
+.roll-vertical + .ruler-scale {
+  height: auto;
+  text-align: center;
+  padding-top: 0.35rem;
+}
+
+/* ── Phones ── */
+@media (max-width: 640px) {
+  /* Compact header that scrolls away instead of covering a quarter of the screen */
+  header {
+    position: static;
+    padding: 0.6rem 0.75rem;
+  }
+  .header-inner {
+    gap: 0.5rem;
+  }
+  .brand-logo-img {
+    height: 30px;
+  }
+  .header-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .header-actions .role-toggle {
+    flex: 1 1 100%;
+    display: flex;
+  }
+  .header-actions .role-toggle .role-btn {
+    flex: 1;
+  }
+  .header-actions .btn {
+    flex: 1;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .container {
+    padding: 0 0.5rem;
+  }
+
+  /* Figures two per row */
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4rem;
+  }
+  .kpi-card {
+    padding: 0.45rem 0.55rem;
+  }
+  .kpi-value {
+    font-size: 1.05rem;
+  }
+
+  /* 16px inputs stop iPhones zooming in when a box is tapped */
+  .form-input,
+  .form-select,
+  .order-table input,
+  .paste-list-text {
+    font-size: 16px;
+  }
+
+  /* Core | OD, then Length | Rounds */
+  .roll-fields-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Bigger touch targets */
+  .counter-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+  .btn-del-row {
+    padding: 8px 10px;
+  }
+
+  .table-responsive {
+    overflow-x: visible;
+  }
+}
+
+/* Tables become one card per size (each value with its column name) whenever their
+   panel is too narrow for the full table: phones, iPads, small laptop windows */
+.table-responsive {
+  container-type: inline-size;
+}
+
+@container (max-width: 640px) {
+  .comp-table thead {
+    display: none;
+  }
+  .comp-table,
+  .comp-table tbody {
+    display: block;
+  }
+  .comp-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.3rem 0.75rem;
+    padding: 0.6rem 0.2rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .comp-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0;
+    border: none;
+    font-size: 0.85rem;
+    min-width: 0;
+  }
+  .comp-table td .badge {
+    white-space: normal;
+    text-align: right;
+  }
+  .comp-table td::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    font-size: 0.72rem;
+  }
+  .comp-table td:first-child {
+    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+  .comp-table td:first-child::before {
+    content: none;
+  }
+  .comp-table .counter-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 1.05rem;
+  }
 }

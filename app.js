@@ -568,6 +568,11 @@ function calculateNow() {
   document.body.classList.remove('results-stale');
   const btn = document.getElementById('calculateBtn');
   if (btn) btn.innerText = '⚡ Calculate';
+
+  // One-column layouts (phones, iPad portrait): results are below the inputs, so jump to them
+  if (window.innerWidth < 900) {
+    document.querySelector('.right-panel')?.scrollIntoView({ block: 'start' });
+  }
 }
 
 /**
@@ -1058,16 +1063,16 @@ function renderRollSetsTable() {
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>
+      <td data-label="Size">
         <span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${getColorForWidth(cut.width)}; margin-right:4px;"></span>
         <strong>${cut.width} mm</strong>
       </td>
-      <td><strong>${cut.count}</strong> cuts</td>
-      <td><strong>${rollsPerSet}</strong> /cycle</td>
-      <td><strong style="color:var(--accent-orange); font-size:0.85rem;">${totalRolls}</strong> rolls</td>
-      <td><strong>${singleRollKg} kg</strong></td>
-      <td><strong style="color:var(--accent-blue);">${totalFgKg} kg</strong></td>
-      <td>
+      <td data-label="Cuts"><strong>${cut.count}</strong> cuts</td>
+      <td data-label="Per Round"><strong>${rollsPerSet}</strong> /cycle</td>
+      <td data-label="Total Rolls"><strong style="color:var(--accent-orange); font-size:0.85rem;">${totalRolls}</strong> rolls</td>
+      <td data-label="Kg / Roll"><strong>${singleRollKg} kg</strong></td>
+      <td data-label="Total Kg"><strong style="color:var(--accent-blue);">${totalFgKg} kg</strong></td>
+      <td data-label="Core / OD">
         <span class="badge badge-info" style="padding:1px 5px; font-size:0.7rem;">${state.master.coreDiaInch}" Core</span>
         <span style="font-size:0.7rem; color:var(--text-muted); margin-left:3px;">${state.master.resultingOdInch}" OD</span>
       </td>
@@ -1101,8 +1106,26 @@ function renderRollVisualizer() {
   if (scale) scale.innerHTML = '';
 
   const masterWidth = state.master.widthMm;
-  // Includes the parent-roll tolerance when used, so the strips always add up to 100%
   const rollWidth = masterWidth;
+
+  // Phones and tablets: when the panel is too narrow for the thinnest cut to be readable
+  // (< 13px wide), draw the roll top-to-bottom (top = left edge of the roll) with one
+  // readable block per size, e.g. "18 mm × 4". Laptops keep the left-to-right view.
+  const wrapWidth = schematic.parentElement.clientWidth;
+  const narrowestCut = Math.min(...d.cutsMap.filter(c => c.count > 0).map(c => c.width));
+  const narrowestPx = wrapWidth * (narrowestCut / rollWidth);
+  const vertical = wrapWidth > 0 && (wrapWidth < 600 || (wrapWidth < 820 && narrowestPx < 13));
+  schematic.classList.toggle('roll-vertical', vertical);
+  const orderHint = document.getElementById('rollOrderHint');
+  if (orderHint) {
+    orderHint.innerText = vertical ? 'Sizes in mm, top to bottom = left to right across the shaft'
+                                   : 'Sizes in mm, left to right across the shaft';
+  }
+  if (vertical) {
+    renderVerticalRoll(schematic, scale, d, rollWidth);
+    return;
+  }
+  schematic.style.height = '';
 
   // Operator view: each strip shows only its size in mm. The diagram always fits the panel
   // width (never scrolls); fitSegmentLabels() picks horizontal or vertical text per strip.
@@ -1142,10 +1165,39 @@ function renderRollVisualizer() {
 }
 
 /**
+ * Phone layout of the roll: a top-to-bottom column, one block per size with a dashed line
+ * between each roll. Block heights stay proportional; the column grows so the smallest
+ * block is still at least ~30px tall.
+ */
+function renderVerticalRoll(schematic, scale, d, rollWidth) {
+  const groups = d.cutsMap.filter(c => c.count > 0)
+    .map(c => ({ widthMm: c.width * c.count, label: `${c.width} mm${c.count > 1 ? ` × ${c.count}` : ''}`, count: c.count, color: getColorForWidth(c.width) }));
+  if (d.trimRight > 0) groups.push({ widthMm: d.trimRight, label: `Trim ${d.trimRight} mm`, count: 1, trim: true });
+
+  const smallest = Math.max(1, Math.min(...groups.filter(g => !g.trim).map(g => g.widthMm)));
+  const heightPx = Math.round(Math.min(2400, Math.max(360, rollWidth * (30 / smallest))));
+  schematic.style.height = `${heightPx}px`;
+
+  schematic.innerHTML = groups.map(g => {
+    const dividers = g.count > 1
+      ? `background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(${100 / g.count}% - 1px), rgba(255,255,255,0.55) calc(${100 / g.count}% - 1px), rgba(255,255,255,0.55) ${100 / g.count}%);`
+      : '';
+    return `<div class="roll-segment roll-group${g.trim ? ' segment-trim' : ''}" title="${g.label}"
+      style="height:${(g.widthMm / rollWidth) * 100}%; ${g.trim ? '' : `background-color:${g.color};`} ${dividers}">
+      <span class="seg-label">${g.label}</span></div>`;
+  }).join('');
+
+  if (scale) {
+    scale.innerHTML = `<div>Top = left edge (0 mm) &nbsp;&darr;&nbsp; Bottom = right edge (${rollWidth} mm)</div>`;
+  }
+}
+
+/**
  * Makes every strip label fit its strip: large horizontal text when there is room,
  * otherwise vertical text shrunk to the strip width (down to a 7px floor for very thin cuts).
  */
 function fitSegmentLabels() {
+  if (document.getElementById('rollSchematic')?.classList.contains('roll-vertical')) return;
   document.querySelectorAll('#rollSchematic .roll-segment').forEach(seg => {
     const label = seg.querySelector('.seg-label');
     const w = seg.getBoundingClientRect().width;
@@ -1160,11 +1212,12 @@ function fitSegmentLabels() {
   });
 }
 
-// Re-fit labels when the window size changes (strip widths change with it)
+// Redraw the roll when the window size changes (strip widths change, and a phone
+// rotating can switch between the left-to-right and top-to-bottom layouts)
 let fitLabelsTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(fitLabelsTimer);
-  fitLabelsTimer = setTimeout(fitSegmentLabels, 100);
+  fitLabelsTimer = setTimeout(renderRollVisualizer, 100);
 });
 
 function renderComparisonTable() {
@@ -1182,25 +1235,26 @@ function renderComparisonTable() {
       : `<span class="badge badge-warning">⚠️ High Var (±${cut.pctDiff}%)</span>`;
 
     const tr = document.createElement('tr');
+    // data-label = column name, shown on phones where each row becomes a card
     tr.innerHTML = `
-      <td>
+      <td data-label="Size">
         <span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${getColorForWidth(cut.width)}; margin-right:4px;"></span>
         <strong>${cut.width} mm</strong>
       </td>
-      <td>
+      <td data-label="Blades">
         <div style="display:flex; align-items:center; gap:4px;">
-          <button class="counter-btn" onclick="updateCustomBladeCount(${cut.width}, -1)">-</button>
+          <button class="counter-btn" onclick="updateCustomBladeCount(${cut.width}, -1)" aria-label="One less ${cut.width} mm blade">-</button>
           <span class="counter-value">${cut.count}</span>
-          <button class="counter-btn" onclick="updateCustomBladeCount(${cut.width}, 1)">+</button>
+          <button class="counter-btn" onclick="updateCustomBladeCount(${cut.width}, 1)" aria-label="One more ${cut.width} mm blade">+</button>
         </div>
       </td>
-      <td>${cut.totalWidth} mm</td>
-      <td>${cut.targetKg} kg</td>
-      <td><strong style="color:var(--accent-blue)">${cut.producedKg} kg</strong></td>
-      <td style="color:${isOver ? 'var(--accent-green)' : 'var(--accent-amber)'}">
+      <td data-label="Span">${cut.totalWidth} mm</td>
+      <td data-label="Ordered">${cut.targetKg} kg</td>
+      <td data-label="Produced"><strong style="color:var(--accent-blue)">${cut.producedKg} kg</strong></td>
+      <td data-label="Difference" style="color:${isOver ? 'var(--accent-green)' : 'var(--accent-amber)'}">
         ${isOver ? '+' : ''}${cut.diffKg} kg
       </td>
-      <td>${tolBadge}</td>
+      <td data-label="Status">${tolBadge}</td>
     `;
     tbody.appendChild(tr);
   });
