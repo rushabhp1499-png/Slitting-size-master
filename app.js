@@ -21,7 +21,7 @@ const state = {
     minTrimLeft: 10,
     minTrimRight: 10,
     minSlitWidth: 12,
-    maxKnives: 35,
+    maxKnives: 50, // most knives the slitter shaft can hold
     weightTolerancePct: 15,
     machineSpeed: 400,
     setupMinutes: 20,
@@ -233,7 +233,7 @@ function initUI() {
     'thicknessInput', 'densityInput',
     'masterWidthInput', 'parentTolInput', 'masterWeightInput', 
     'trimLeftInput', 'trimRightInput', 'minSlitInput', 'toleranceInput',
-    'machineSpeedInput', 'setupTimeInput', 'targetOdInput'
+    'machineSpeedInput', 'setupTimeInput', 'targetOdInput', 'maxKnivesInput'
   ];
 
   masterInputs.forEach(id => {
@@ -348,6 +348,7 @@ function readMasterInputs() {
   state.master.machineSpeed = parseFloat(document.getElementById('machineSpeedInput')?.value) || 400;
   state.master.rollChangeMinutes = parseFloat(document.getElementById('setupTimeInput')?.value) || 5;
   state.master.targetOdInch = parseFloat(document.getElementById('targetOdInput')?.value) || 10;
+  state.master.maxKnives = parseInt(document.getElementById('maxKnivesInput')?.value) || 50;
 }
 
 function calculateMaterialSpecs() {
@@ -634,9 +635,15 @@ function runOptimizer() {
   const maxTolMm = state.master.parentTolMm || 2;
   const maxSearchWidth = usableWidth + maxTolMm;
   const minCuts = (minSum <= usableWidth) ? 1 : 0;
+  const maxKnives = state.master.maxKnives || 50;
+  let bladeLimitRejects = 0;
 
   function evaluateCandidate(bladeCounts, cutsWidth) {
     const totalBlades = Object.values(bladeCounts).reduce((a, b) => a + b, 0);
+    if (totalBlades > maxKnives) { // Machine shaft cannot hold more knives
+      bladeLimitRejects++;
+      return null;
+    }
     const isTolAllowed = totalBlades > 12; // Factory rule: tolerance adjustment permitted only if > 12 blades
     const allowedParentWidth = isTolAllowed ? (masterWidth + maxTolMm) : masterWidth;
     const minRequiredTrim = (state.master.minTrimLeft + state.master.minTrimRight);
@@ -729,48 +736,61 @@ function runOptimizer() {
 
   // Dynamic-programming search over total cut width in 0.1 mm steps.
   // For every reachable total width it keeps the blade allocation with the smallest summed
-  // % weight deviation. Work grows linearly with the number of sizes (the old recursive
-  // search grew exponentially and froze the browser beyond ~8 sizes).
+  // % weight deviation (+ an optional per-knife penalty). Work grows linearly with the number
+  // of sizes (the old recursive search grew exponentially and froze the browser beyond ~8 sizes).
   const SCALE = 10;
   const cap = Math.floor(maxSearchWidth * SCALE + 1e-6);
-  let best = new Float64Array(cap + 1).fill(Infinity);
-  best[0] = 0;
-  const picks = []; // picks[i][w] = cuts of item i on the best path reaching width w
 
-  items.forEach(it => {
-    const unit = Math.round(it.width * SCALE);
-    const maxCuts = Math.floor(cap / unit);
-    const devByCuts = new Float64Array(maxCuts + 1);
-    for (let c = 0; c <= maxCuts; c++) {
-      const producedKg = masterWeight * ((c * it.width) / masterWidth);
-      devByCuts[c] = it.targetKg > 0 ? (Math.abs(producedKg - it.targetKg) / it.targetKg) * 100 : 0;
-    }
+  function runWidthDp(perKnifePenalty) {
+    let best = new Float64Array(cap + 1).fill(Infinity);
+    best[0] = 0;
+    const picks = []; // picks[i][w] = cuts of item i on the best path reaching width w
 
-    const next = new Float64Array(cap + 1).fill(Infinity);
-    const pick = new Uint16Array(cap + 1);
-    for (let w = 0; w <= cap; w++) {
-      const base = best[w];
-      if (base === Infinity) continue;
-      for (let c = minCuts, nw = w + minCuts * unit; c <= maxCuts && nw <= cap; c++, nw += unit) {
-        const v = base + devByCuts[c];
-        if (v < next[nw]) { next[nw] = v; pick[nw] = c; }
+    items.forEach(it => {
+      const unit = Math.round(it.width * SCALE);
+      const maxCuts = Math.min(maxKnives, Math.floor(cap / unit));
+      const devByCuts = new Float64Array(maxCuts + 1);
+      for (let c = 0; c <= maxCuts; c++) {
+        const producedKg = masterWeight * ((c * it.width) / masterWidth);
+        devByCuts[c] = (it.targetKg > 0 ? (Math.abs(producedKg - it.targetKg) / it.targetKg) * 100 : 0)
+          + perKnifePenalty * c;
       }
-    }
-    picks.push({ pick, unit });
-    best = next;
-  });
 
-  // One candidate per reachable total width (at most ~10,000), each with its best kg match
-  for (let w = 1; w <= cap; w++) {
-    if (best[w] === Infinity) continue;
-    const counts = {};
-    let rem = w;
-    for (let i = items.length - 1; i >= 0; i--) {
-      const c = picks[i].pick[rem];
-      counts[items[i].width] = c;
-      rem -= c * picks[i].unit;
+      const next = new Float64Array(cap + 1).fill(Infinity);
+      const pick = new Uint16Array(cap + 1);
+      for (let w = 0; w <= cap; w++) {
+        const base = best[w];
+        if (base === Infinity) continue;
+        for (let c = minCuts, nw = w + minCuts * unit; c <= maxCuts && nw <= cap; c++, nw += unit) {
+          const v = base + devByCuts[c];
+          if (v < next[nw]) { next[nw] = v; pick[nw] = c; }
+        }
+      }
+      picks.push({ pick, unit });
+      best = next;
+    });
+
+    // One candidate per reachable total width (at most ~10,000), each with its best kg match
+    for (let w = 1; w <= cap; w++) {
+      if (best[w] === Infinity) continue;
+      const counts = {};
+      let rem = w;
+      for (let i = items.length - 1; i >= 0; i--) {
+        const c = picks[i].pick[rem];
+        counts[items[i].width] = c;
+        rem -= c * picks[i].unit;
+      }
+      evaluateCandidate(counts, widthOf(counts));
     }
-    evaluateCandidate(counts, widthOf(counts));
+  }
+
+  runWidthDp(0);
+  // Some widths needed more knives than the shaft holds: re-run with a growing per-knife
+  // penalty so the search also offers layouts within the knife limit for those widths.
+  for (const penalty of [0.5, 2, 8, 32]) {
+    if (bladeLimitRejects === 0) break;
+    bladeLimitRejects = 0;
+    runWidthDp(penalty);
   }
 
   // Local polish: the DP ignores the max-deviation term of the scores, so nudge the best
@@ -826,6 +846,18 @@ function runOptimizer() {
     evaluateCandidate(fallbackCounts, usedW);
   }
 
+  if (candidates.length === 0) {
+    if (feasibilityBanner) {
+      feasibilityBanner.style.display = 'flex';
+      feasibilityBanner.className = 'alert alert-danger';
+      feasibilityBanner.innerHTML = `<div><strong>No single-setup layout found:</strong> these sizes cannot be cut from one roll within ${maxKnives} knives and the usable width (${usableWidth} mm). Remove some sizes or split the order into two setups.</div>`;
+    }
+    state.solutions = [];
+    state.selectedSolution = null;
+    renderAll();
+    return;
+  }
+
   // Filter and pick Top 3 Distinct Recipes
   // 1. Champion Balanced
   candidates.sort((a, b) => a.scoreBalanced - b.scoreBalanced);
@@ -870,6 +902,12 @@ function selectRecipe(sol) {
  */
 function updateCustomBladeCount(width, delta) {
   const current = state.customBlades[width] || 0;
+  const maxKnives = state.master.maxKnives || 50;
+  const bladesNow = Object.values(state.customBlades).reduce((a, b) => a + b, 0);
+  if (delta > 0 && bladesNow >= maxKnives) {
+    alert(`The machine holds at most ${maxKnives} knives. Remove a knife from another size first.`);
+    return;
+  }
   const next = Math.max(0, current + delta);
   state.customBlades[width] = next;
 
