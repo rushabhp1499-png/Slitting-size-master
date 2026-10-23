@@ -301,11 +301,26 @@
         <div class="card">
           <div class="card-header">
             <div class="card-title"><span>📋</span> Slit Requirements</div>
-            <button id="addCutBtn" class="btn btn-outline btn-sm">+ Add Size</button>
+            <div style="display:flex; gap:6px;">
+              <button id="pasteListBtn" class="btn btn-outline btn-sm" title="Paste many sizes at once, e.g. two columns from Excel">📋 Paste List</button>
+              <button id="addCutBtn" class="btn btn-outline btn-sm">+ Add Size</button>
+            </div>
           </div>
           <div class="card-body" style="padding-top:0.4rem;">
 
+            <!-- Paste many sizes at once -->
+            <div id="pasteListPanel" class="paste-list-panel" style="display:none;">
+              <label class="form-label" for="pasteListText">Paste sizes: one per line, width (mm) then weight (kg)</label>
+              <textarea id="pasteListText" class="form-input paste-list-text" rows="6" placeholder="120	60&#10;18	100&#10;20	80&#10;15	50"></textarea>
+              <div class="hint-text">Copy two columns straight from Excel or WhatsApp. This replaces the current list.</div>
+              <div style="display:flex; gap:6px; justify-content:flex-end; margin-top:0.4rem;">
+                <button type="button" id="pasteListCancelBtn" class="btn btn-outline btn-sm">Cancel</button>
+                <button type="button" id="pasteListApplyBtn" class="btn btn-primary btn-sm">Load &amp; Calculate</button>
+              </div>
+            </div>
+
             <div id="mechanicalAlert" style="display:none;"></div>
+            <div id="calcErrorBanner" class="alert alert-danger" style="display:none;"></div>
             <div id="feasibilityBanner" style="display:none;"></div>
 
             <div class="table-responsive">
@@ -330,6 +345,9 @@
               <strong id="totalTargetKgDisplay" style="color:var(--accent-blue); font-family:var(--font-mono); font-size:0.95rem;">-- kg</strong>
             </div>
 
+            <button type="button" id="calculateBtn" class="btn btn-primary calc-btn">⚡ Calculate</button>
+            <div class="hint-text" style="text-align:center;">Enter all sizes first, then press Calculate (or Enter).</div>
+
           </div>
         </div>
 
@@ -337,6 +355,10 @@
 
       <!-- RIGHT COLUMN: Optimization Results, Roll Diagram & Job Card -->
       <div class="right-panel">
+
+        <div class="stale-notice">
+          Sizes or roll specs changed. Press <strong>⚡ Calculate</strong> (or Enter) to update these results.
+        </div>
 
         <!-- Big Operator Action Directive Banner -->
         <div class="operator-directive-banner no-print" id="operatorDirectiveBanner">

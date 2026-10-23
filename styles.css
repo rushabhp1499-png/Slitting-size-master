@@ -303,6 +303,64 @@ header {
   align-items: start;
 }
 
+/* Calculate-on-demand: big button, paste panel, and dimmed results while inputs are unsaved */
+.calc-btn {
+  width: 100%;
+  margin-top: 0.6rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  justify-content: center;
+}
+
+body.results-stale .calc-btn {
+  background: var(--accent-orange);
+  border-color: var(--accent-orange);
+  animation: calc-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes calc-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(249, 115, 22, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.results-stale .calc-btn { animation: none; }
+}
+
+.paste-list-panel {
+  margin-bottom: 0.6rem;
+  padding: 0.6rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+}
+
+.paste-list-text {
+  width: 100%;
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+.stale-notice {
+  display: none;
+  margin-bottom: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--accent-orange);
+  border-radius: 6px;
+  color: var(--accent-orange);
+  font-size: 0.85rem;
+}
+
+body.results-stale .stale-notice {
+  display: block;
+}
+
+body.results-stale .right-panel > :not(.stale-notice),
+body.results-stale .kpi-grid {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
 /* Let grid columns shrink so wide tables scroll inside their cards instead of widening the page */
 .main-grid > * {
   min-width: 0;

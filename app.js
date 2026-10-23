@@ -153,8 +153,7 @@ function initUI() {
       if (plasticSection) plasticSection.style.display = 'block';
       if (paperSection) paperSection.style.display = 'none';
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
 
     switchPaperBtn.addEventListener('click', () => {
@@ -164,8 +163,7 @@ function initUI() {
       if (plasticSection) plasticSection.style.display = 'none';
       if (paperSection) paperSection.style.display = 'block';
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   }
 
@@ -181,8 +179,7 @@ function initUI() {
         if (densInput) densInput.value = preset.density;
       }
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   }
 
@@ -200,16 +197,14 @@ function initUI() {
         state.master.paperThicknessMicrons = estMicrons;
       }
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   }
   if (paperThicknessInput) {
     paperThicknessInput.addEventListener('input', () => {
       state.master.paperThicknessMicrons = parseFloat(paperThicknessInput.value) || 90;
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   }
 
@@ -247,8 +242,7 @@ function initUI() {
       el.addEventListener('input', () => {
         readMasterInputs();
         state.master.userCycleOverride = null;
-        calculateMaterialSpecs();
-        runOptimizer();
+        markResultsStale();
       });
     }
   });
@@ -259,8 +253,7 @@ function initUI() {
     coreSelect.addEventListener('change', (e) => {
       state.master.coreDiaInch = parseFloat(e.target.value) || 3;
       state.master.userCycleOverride = null;
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   }
 
@@ -283,8 +276,7 @@ function initUI() {
 
       state.master.userCycleOverride = null;
       readMasterInputs();
-      calculateMaterialSpecs();
-      runOptimizer();
+      markResultsStale();
     });
   });
 
@@ -293,7 +285,38 @@ function initUI() {
     const nextId = state.orders.length ? Math.max(...state.orders.map(o => o.id)) + 1 : 1;
     state.orders.push({ id: nextId, width: 25, targetKg: 50 });
     renderOrdersTable();
-    runOptimizer();
+    markResultsStale();
+    // Jump straight into the new row's width box
+    const inputs = document.querySelectorAll('#ordersTableBody .row-input[data-field="width"]');
+    if (inputs.length) inputs[inputs.length - 1].select();
+  });
+
+  // Calculate button + Ctrl/Cmd+Enter shortcut anywhere on the page
+  document.getElementById('calculateBtn').addEventListener('click', calculateNow);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      calculateNow();
+    }
+  });
+
+  // Paste-a-list panel
+  const pastePanel = document.getElementById('pasteListPanel');
+  const pasteText = document.getElementById('pasteListText');
+  document.getElementById('pasteListBtn').addEventListener('click', () => {
+    const open = pastePanel.style.display === 'none';
+    pastePanel.style.display = open ? 'block' : 'none';
+    if (open) pasteText.focus();
+  });
+  document.getElementById('pasteListCancelBtn').addEventListener('click', () => {
+    pastePanel.style.display = 'none';
+  });
+  document.getElementById('pasteListApplyBtn').addEventListener('click', () => {
+    if (loadOrdersFromText(pasteText.value)) {
+      pasteText.value = '';
+      pastePanel.style.display = 'none';
+      calculateNow();
+    }
   });
 
   // Preset buttons
@@ -303,6 +326,7 @@ function initUI() {
 
   // Print button
   document.getElementById('printJobCardBtn').addEventListener('click', () => {
+    if (state.resultsStale) calculateNow();
     window.print();
   });
 
@@ -399,13 +423,8 @@ function renderOrdersTable() {
   if (!tbody) return;
   tbody.innerHTML = '';
 
-  let totalTargetKg = 0;
-  let hasMechanicalViolation = false;
-
   state.orders.forEach((order, index) => {
-    totalTargetKg += (order.targetKg || 0);
     const isBelowMin = order.width < state.master.minSlitWidth;
-    if (isBelowMin) hasMechanicalViolation = true;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -430,16 +449,30 @@ function renderOrdersTable() {
   });
 
   // Attach input listeners
+  // Typing only updates state + totals (no table rebuild, no optimizer run) so focus stays put
   tbody.querySelectorAll('.row-input').forEach(input => {
-    input.addEventListener('change', (e) => {
+    input.addEventListener('input', (e) => {
       const id = parseInt(e.target.dataset.id);
       const field = e.target.dataset.field;
-      const val = parseFloat(e.target.value) || 0;
       const order = state.orders.find(o => o.id === id);
       if (order) {
-        order[field] = val;
-        renderOrdersTable();
-        runOptimizer();
+        order[field] = parseFloat(e.target.value) || 0;
+        updateOrdersSummary();
+        markResultsStale();
+      }
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        calculateNow();
+      }
+    });
+    // Pasting several lines (e.g. two columns copied from Excel) loads the whole list
+    input.addEventListener('paste', (e) => {
+      const text = (e.clipboardData || window.clipboardData).getData('text');
+      if (/[\r\n]/.test(text.trim())) {
+        e.preventDefault();
+        if (loadOrdersFromText(text)) calculateNow();
       }
     });
   });
@@ -449,14 +482,33 @@ function renderOrdersTable() {
       const id = parseInt(e.target.dataset.id);
       state.orders = state.orders.filter(o => o.id !== id);
       renderOrdersTable();
-      runOptimizer();
+      markResultsStale();
     });
   });
+
+  updateOrdersSummary();
+}
+
+/**
+ * Refreshes the total kg, per-row feasibility badges and the min-width alert in place
+ */
+function updateOrdersSummary() {
+  const totalTargetKg = state.orders.reduce((s, o) => s + (o.targetKg || 0), 0);
+  const hasMechanicalViolation = state.orders.some(o => o.width < state.master.minSlitWidth);
 
   const totalTargetEl = document.getElementById('totalTargetKgDisplay');
   if (totalTargetEl) {
     totalTargetEl.innerText = `${totalTargetKg.toFixed(1)} kg`;
   }
+
+  document.querySelectorAll('#ordersTableBody tr').forEach((tr, i) => {
+    const order = state.orders[i];
+    const cell = tr.children[3];
+    if (!order || !cell) return;
+    cell.innerHTML = order.width < state.master.minSlitWidth
+      ? `<span class="badge badge-danger">⚠️ &lt; ${state.master.minSlitWidth}mm (Impossible)</span>`
+      : `<span class="badge badge-success">✓ Feasible</span>`;
+  });
 
   // Update order feasibility warning banner
   const alertEl = document.getElementById('mechanicalAlert');
@@ -469,6 +521,63 @@ function renderOrdersTable() {
       alertEl.style.display = 'none';
     }
   }
+}
+
+/**
+ * Inputs changed: dim the results until the user presses Calculate
+ */
+function markResultsStale() {
+  state.resultsStale = true;
+  document.body.classList.add('results-stale');
+  const btn = document.getElementById('calculateBtn');
+  if (btn) btn.innerText = '⚡ Calculate (inputs changed)';
+}
+
+/**
+ * Runs the full calculation once, on demand (Calculate button / Enter / paste)
+ */
+function calculateNow() {
+  const errorEl = document.getElementById('calcErrorBanner');
+  try {
+    calculateMaterialSpecs();
+    updateOrdersSummary();
+    runOptimizer();
+    if (errorEl) errorEl.style.display = 'none';
+  } catch (err) {
+    console.error(err);
+    if (errorEl) {
+      errorEl.style.display = 'flex';
+      errorEl.innerHTML = `<div><strong>Could not calculate:</strong> please check the sizes and roll specs for empty or zero values, then press Calculate again.</div>`;
+    }
+  }
+  state.resultsStale = false;
+  document.body.classList.remove('results-stale');
+  const btn = document.getElementById('calculateBtn');
+  if (btn) btn.innerText = '⚡ Calculate';
+}
+
+/**
+ * Replaces the size list with rows parsed from pasted text.
+ * One size per line: width (mm) then target weight (kg), separated by tab, comma or space.
+ * Lines without two numbers (headers, blanks) are skipped.
+ */
+function loadOrdersFromText(text) {
+  const rows = [];
+  text.split(/\r?\n/).forEach(line => {
+    const nums = (line.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+    if (nums.length >= 2 && nums[0] > 0 && rows.length < 200) {
+      rows.push({ id: rows.length + 1, width: nums[0], targetKg: nums[1] });
+    }
+  });
+
+  if (rows.length === 0) {
+    alert('No sizes found. Paste one size per line: width in mm, then weight in kg (for example: 120  60).');
+    return false;
+  }
+
+  state.orders = rows;
+  renderOrdersTable();
+  return true;
 }
 
 /**
@@ -513,55 +622,18 @@ function runOptimizer() {
     }
   }
 
-  // Target weights and sizes
-  const items = state.orders.map(o => ({
-    id: o.id,
-    width: o.width,
-    targetKg: o.targetKg
-  }));
+  // Target weights and sizes (rows with the same width are merged: they share the same knives)
+  const items = [];
+  state.orders.forEach(o => {
+    const existing = items.find(it => it.width === o.width);
+    if (existing) existing.targetKg += o.targetKg;
+    else items.push({ id: o.id, width: o.width, targetKg: o.targetKg });
+  });
 
-  const totalTargetKg = items.reduce((s, it) => s + it.targetKg, 0);
-
-  // Combinatorial search
   const candidates = [];
-  const initialBlades = {};
-  items.forEach(it => { initialBlades[it.width] = (minSum <= usableWidth) ? 1 : 0; });
-
   const maxTolMm = state.master.parentTolMm || 2;
   const maxSearchWidth = usableWidth + maxTolMm;
-
-  // Recursive search to find optimal blade counts
-  function search(index, currentWidth, currentCounts) {
-    if (index === items.length) {
-      if (currentWidth > 0 && currentWidth <= maxSearchWidth) {
-        evaluateCandidate(currentCounts, currentWidth);
-      }
-      return;
-    }
-
-    const item = items[index];
-    const width = item.width;
-    const minCuts = (minSum <= usableWidth) ? 1 : 0;
-
-    // Estimate ideal cut count based on target weight proportion
-    const idealKgFraction = totalTargetKg > 0 ? (item.targetKg / totalTargetKg) : (1 / items.length);
-    const idealWidthAllocation = usableWidth * idealKgFraction;
-    const idealCuts = Math.max(minCuts, Math.round(idealWidthAllocation / width));
-    
-    // Search a practical range around ideal cuts
-    const maxPossible = Math.floor((maxSearchWidth - currentWidth) / width);
-    const low = minCuts;
-    const high = Math.min(maxPossible, Math.max(idealCuts + 3, minCuts + 2));
-
-    for (let c = low; c <= high; c++) {
-      const nextWidth = currentWidth + (c * width);
-      if (nextWidth <= maxSearchWidth) {
-        currentCounts[width] = (currentCounts[width] || 0) + c;
-        search(index + 1, nextWidth, currentCounts);
-        currentCounts[width] -= c;
-      }
-    }
-  }
+  const minCuts = (minSum <= usableWidth) ? 1 : 0;
 
   function evaluateCandidate(bladeCounts, cutsWidth) {
     const totalBlades = Object.values(bladeCounts).reduce((a, b) => a + b, 0);
@@ -626,7 +698,7 @@ function runOptimizer() {
     // Score 3 (Weight Fidelity): Heavy weight on precision kg delivery
     const scoreExactKg = (scrapPct * 0.5) + (meanPctDiff * 2.5) + (maxPctDiff * 1.5);
 
-    candidates.push({
+    const candidate = {
       bladeCounts: { ...bladeCounts },
       cutsMap,
       cutsWidth,
@@ -646,11 +718,97 @@ function runOptimizer() {
       scoreBalanced,
       scoreMinScrap,
       scoreExactKg
-    });
+    };
+    candidates.push(candidate);
+    return candidate;
   }
 
-  // Run the branch-and-bound search
-  search(0, 0, {});
+  function widthOf(bladeCounts) {
+    return items.reduce((sum, it) => sum + (bladeCounts[it.width] || 0) * it.width, 0);
+  }
+
+  // Dynamic-programming search over total cut width in 0.1 mm steps.
+  // For every reachable total width it keeps the blade allocation with the smallest summed
+  // % weight deviation. Work grows linearly with the number of sizes (the old recursive
+  // search grew exponentially and froze the browser beyond ~8 sizes).
+  const SCALE = 10;
+  const cap = Math.floor(maxSearchWidth * SCALE + 1e-6);
+  let best = new Float64Array(cap + 1).fill(Infinity);
+  best[0] = 0;
+  const picks = []; // picks[i][w] = cuts of item i on the best path reaching width w
+
+  items.forEach(it => {
+    const unit = Math.round(it.width * SCALE);
+    const maxCuts = Math.floor(cap / unit);
+    const devByCuts = new Float64Array(maxCuts + 1);
+    for (let c = 0; c <= maxCuts; c++) {
+      const producedKg = masterWeight * ((c * it.width) / masterWidth);
+      devByCuts[c] = it.targetKg > 0 ? (Math.abs(producedKg - it.targetKg) / it.targetKg) * 100 : 0;
+    }
+
+    const next = new Float64Array(cap + 1).fill(Infinity);
+    const pick = new Uint16Array(cap + 1);
+    for (let w = 0; w <= cap; w++) {
+      const base = best[w];
+      if (base === Infinity) continue;
+      for (let c = minCuts, nw = w + minCuts * unit; c <= maxCuts && nw <= cap; c++, nw += unit) {
+        const v = base + devByCuts[c];
+        if (v < next[nw]) { next[nw] = v; pick[nw] = c; }
+      }
+    }
+    picks.push({ pick, unit });
+    best = next;
+  });
+
+  // One candidate per reachable total width (at most ~10,000), each with its best kg match
+  for (let w = 1; w <= cap; w++) {
+    if (best[w] === Infinity) continue;
+    const counts = {};
+    let rem = w;
+    for (let i = items.length - 1; i >= 0; i--) {
+      const c = picks[i].pick[rem];
+      counts[items[i].width] = c;
+      rem -= c * picks[i].unit;
+    }
+    evaluateCandidate(counts, widthOf(counts));
+  }
+
+  // Local polish: the DP ignores the max-deviation term of the scores, so nudge the best
+  // recipe for each score by +/-1 blade (or moving a blade between sizes) while it improves.
+  function polish(start, scoreKey) {
+    let current = start;
+    for (let round = 0; round < 100; round++) {
+      let improved = null;
+      const tryCounts = counts => {
+        if (items.some(it => (counts[it.width] || 0) < minCuts)) return;
+        const w = widthOf(counts);
+        if (w <= 0 || w > maxSearchWidth) return;
+        const before = candidates.length;
+        const cand = evaluateCandidate(counts, w);
+        if (candidates.length > before) candidates.pop(); // only keep winners
+        if (cand && cand[scoreKey] < (improved || current)[scoreKey] - 1e-9) improved = cand;
+      };
+      items.forEach((a, i) => {
+        [-1, 1].forEach(d => tryCounts({ ...current.bladeCounts, [a.width]: (current.bladeCounts[a.width] || 0) + d }));
+        items.forEach((b, j) => {
+          if (i === j) return;
+          tryCounts({ ...current.bladeCounts,
+            [a.width]: (current.bladeCounts[a.width] || 0) + 1,
+            [b.width]: (current.bladeCounts[b.width] || 0) - 1 });
+        });
+      });
+      if (!improved) break;
+      current = improved;
+    }
+    if (current !== start) candidates.push(current);
+  }
+
+  if (candidates.length > 0) {
+    ['scoreBalanced', 'scoreMinScrap', 'scoreExactKg'].forEach(key => {
+      const top = candidates.reduce((a, b) => (b[key] < a[key] ? b : a));
+      polish(top, key);
+    });
+  }
 
   if (candidates.length === 0) {
     // Fallback: simple proportional allocation
@@ -1407,6 +1565,5 @@ function loadUserSample() {
   if (odInput) odInput.value = 10;
 
   renderOrdersTable();
-  calculateMaterialSpecs();
-  runOptimizer();
+  calculateNow();
 }
