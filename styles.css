@@ -541,6 +541,7 @@ body.results-stale .kpi-grid {
 }
 
 .status-ok { color: var(--accent-green); }
+body.customer-mode .status-ok { visibility: hidden; } /* customers only need the warnings */
 .status-bad { color: var(--accent-red); cursor: help; }
 
 .btn-del-row {
@@ -1048,22 +1049,21 @@ body.customer-mode .customer-quote-banner {
     min-width: 25mm;
   }
 
+  /* 10 spec boxes in two rows of 5 */
   .jc-specs {
     display: grid;
-    grid-template-columns: 1.6fr 1.4fr 1fr 1fr 1fr 0.7fr 0.7fr 1fr;
-    border: 1px solid #000;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
     margin-bottom: 4mm;
   }
 
   .jc-specs > div {
-    padding: 1.5mm 2.5mm;
+    padding: 1.2mm 2.5mm;
     border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
     display: flex;
     flex-direction: column;
-  }
-
-  .jc-specs > div:last-child {
-    border-right: none;
   }
 
   .jc-specs span {
@@ -1161,11 +1161,28 @@ body.customer-mode .customer-quote-banner {
     transform: translateX(50%);
   }
 
-  .jc-ruler {
+  /* Full-width dimension line: ◄──── Master Roll Width 1020 mm ────► */
+  .jc-dimension {
     display: flex;
-    justify-content: space-between;
-    font-size: 8pt;
+    align-items: center;
     margin: 1mm 0 4mm;
+  }
+
+  .jc-dim-line {
+    flex: 1;
+    border-top: 1.5px solid #000;
+  }
+
+  .jc-dim-end {
+    font-size: 9pt;
+    line-height: 1;
+  }
+
+  .jc-dim-label {
+    font-size: 11pt;
+    font-weight: 800;
+    padding: 0 3mm;
+    white-space: nowrap;
   }
 
   .jc-table {

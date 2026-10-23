@@ -871,9 +871,9 @@ function runOptimizer() {
   const bestExactKg = exactKgList.find(c => !sameBlades(c, bestMinScrap) && !sameBlades(c, bestBalanced)) || exactKgList[0];
 
   state.solutions = [
-    { type: 'minscrap', title: 'Recipe A: Minimum Wastage (Recommended)', badge: 'Lowest Trim', data: bestMinScrap },
-    { type: 'balanced', title: 'Recipe B: Balanced', badge: 'Trade-Off', data: bestBalanced },
-    { type: 'exactkg',  title: 'Recipe C: Closest to Ordered Kg', badge: 'Closest Kg', data: bestExactKg }
+    { type: 'minscrap', title: 'Option A: Minimum Wastage (Recommended)', badge: 'Lowest Trim', data: bestMinScrap },
+    { type: 'balanced', title: 'Option B: Balanced', badge: 'Trade-Off', data: bestBalanced },
+    { type: 'exactkg',  title: 'Option C: Closest to Ordered Kg', badge: 'Closest Kg', data: bestExactKg }
   ];
 
   // Keep selection or default to Recipe A
@@ -1013,14 +1013,11 @@ function renderRecipeCards() {
       <div class="recipe-header">
         <div class="recipe-title">${sol.title}</div>
       </div>
-      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:6px;">
-        Cuts: <strong>${d.totalBlades}</strong> (${d.cutsWidth} mm) | Trim: <strong>${d.trimWidth} mm</strong> (${d.scrapPct}%)
-      </div>
       <div class="recipe-stats">
-        <div><strong>FG Yield:</strong> ${d.fgKg} kg</div>
+        <div><strong>Trim:</strong> ${+d.trimWidth.toFixed(1)} mm</div>
+        <div><strong>Yield:</strong> ${d.fgKg} kg (${(100 - d.scrapPct).toFixed(1)}%)</div>
         <div><strong>Scrap Loss:</strong> ${d.scrapKg} kg</div>
-        <div><strong>Mean Var:</strong> ±${d.meanPctDiff}%</div>
-        <div><strong>Max Var:</strong> ±${d.maxPctDiff}%</div>
+        <div><strong>Cuts:</strong> ${d.totalBlades}</div>
       </div>
     `;
 
@@ -1228,6 +1225,12 @@ function renderPrintJobCard() {
 
   // A filled value, or a blank line to write on by hand
   const fillIn = (value) => value ? `<strong>${escapeHtml(value)}</strong>` : '<span class="jc-blank"></span>';
+  const blankShort = '<span class="jc-blank short"></span>';
+
+  // Same format for everyone: machine settings customers can't see print as blanks to fill in
+  const showMachine = state.role !== 'customer';
+  const speedText = showMachine && state.master.machineSpeed ? `${state.master.machineSpeed} m/min` : `${blankShort} m/min`;
+  const timeText = showMachine && state.master.estTimeStr ? state.master.estTimeStr : blankShort;
 
   // ── Cross-section: strips sized for the landscape A4 width (281 mm printable) ──
   const PRINT_WIDTH_PT = 281 * 2.835; // mm -> pt
@@ -1290,6 +1293,8 @@ function renderPrintJobCard() {
       <div><span>Rounds</span><strong>${totalSets}</strong></div>
       <div><span>Knives</span><strong>${d.totalBlades}</strong></div>
       <div><span>Trim (one side)</span><strong>${d.trimWidth.toFixed(1)} mm</strong></div>
+      <div><span>Speed</span><strong>${speedText}</strong></div>
+      <div><span>Est. Time</span><strong>${timeText}</strong></div>
     </div>
 
     <div class="jc-section-title">Master Roll Cross-Section <span>(sizes in mm, left to right; hatched = trim)</span></div>
@@ -1298,8 +1303,10 @@ function renderPrintJobCard() {
     <div class="jc-trim-callout" style="padding-right:${((d.trimWidth / 2) / rollWidth) * 100}%">
       <span class="jc-trim-text">Trim = ${+d.trimWidth.toFixed(1)} mm</span><span class="jc-trim-arrow">&#9650;</span>
     </div>` : ''}
-    <div class="jc-ruler">
-      <span>0</span><span>${Math.round(rollWidth / 2)} mm</span><span>${rollWidth} mm</span>
+    <div class="jc-dimension">
+      <span class="jc-dim-end">&#9664;</span><span class="jc-dim-line"></span>
+      <span class="jc-dim-label">Master Roll Width ${rollWidth} mm</span>
+      <span class="jc-dim-line"></span><span class="jc-dim-end">&#9654;</span>
     </div>
 
     <table class="jc-table">

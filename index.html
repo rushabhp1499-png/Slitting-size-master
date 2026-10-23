@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
   <!-- Bump ?v= on every release so browsers fetch the new files instead of a cached copy -->
-  <link rel="stylesheet" href="styles.css?v=2026-10-24-1">
+  <link rel="stylesheet" href="styles.css?v=2026-10-24-2">
 </head>
 <body>
 
@@ -160,10 +160,10 @@
           </div>
         </div>
 
-        <!-- ── SECTION 2: Machine & Rewind (collapsible on desktop, always expanded) ── -->
-        <div class="card operator-only">
+        <!-- ── SECTION 2: Rolls (everyone) & Machine (manager only) ── -->
+        <div class="card">
           <div class="card-header collapsible-header" id="machineCardHeader">
-            <div class="card-title"><span>⚙️</span> Machine Limits &amp; Rewind</div>
+            <div class="card-title"><span>⚙️</span> Rolls &amp; Machine</div>
             <div style="display:flex;align-items:center;gap:6px;">
               <span class="badge badge-orange" id="maxMeterBadge">Max 1,600m</span>
               <span class="collapse-chevron" id="machineChevron">▲</span>
@@ -195,7 +195,7 @@
               </div>
             </div>
 
-            <div class="input-row form-group">
+            <div class="input-row form-group operator-only">
               <div>
                 <label class="form-label">Slitter Speed</label>
                 <div class="input-with-unit">
@@ -337,9 +337,9 @@
         <div class="no-print">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
             <h3 style="font-size:1rem; font-weight:700; display:flex; align-items:center; gap:8px;">
-              <span>🎯</span> Blade Setup Recipes (Zero Changeover)
+              <span>🎯</span> Cutting Options
             </h3>
-            <span style="font-size:0.72rem; color:var(--text-muted)">Click a recipe to preview</span>
+            <span style="font-size:0.72rem; color:var(--text-muted)">Click an option to see it on the roll</span>
           </div>
           <div class="recipe-cards-grid" id="recipeCardsContainer">
             <!-- Dynamically generated recipe cards -->
@@ -414,6 +414,6 @@
   </div>
 
   <!-- Core JavaScript -->
-  <script src="app.js?v=2026-10-24-1"></script>
+  <script src="app.js?v=2026-10-24-2"></script>
 </body>
 </html>
