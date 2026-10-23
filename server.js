@@ -51,7 +51,9 @@ const server = http.createServer((req, res) => {
     const ext = path.extname(filePath);
     res.writeHead(200, {
       'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-      'X-Content-Type-Options': 'nosniff'
+      'X-Content-Type-Options': 'nosniff',
+      // Always revalidate so a new release shows up without a hard refresh
+      'Cache-Control': 'no-cache'
     });
     res.end(req.method === 'HEAD' ? undefined : content);
   });
