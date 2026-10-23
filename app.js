@@ -19,8 +19,9 @@ const state = {
     parentTolMm: 2, // ±2 mm allowable parent roll tolerance
     weightKg: 1000,
     // Fixed factory settings (not shown in the UI)
+    // Minimum edge trim, always taken on one side: 6 mm above 150 µm, else 8 mm (set in calculateMaterialSpecs)
     minTrimLeft: 0,
-    minTrimRight: 0,
+    minTrimRight: 8,
     minSlitWidth: 6, // standard minimum slit width
     maxKnives: 50, // most knives the slitter shaft can hold
     weightTolerancePct: 15, // weight variance shown as OK vs High Var
@@ -373,6 +374,11 @@ function calculateMaterialSpecs() {
     activeThicknessMicrons = state.master.paperThicknessMicrons || Math.round(state.master.gsm * 1.3);
   }
 
+  // Thick material (> 150 µm) can be trimmed down to 6 mm; thinner material needs at least 8 mm.
+  // All trim is on one side, so it is applied to the right edge only.
+  state.master.minTrimLeft = 0;
+  state.master.minTrimRight = activeThicknessMicrons > 150 ? 6 : 8;
+
   const gsmBadge = document.getElementById('computedGsmBadge');
   if (gsmBadge) gsmBadge.innerText = `${state.master.gsm} GSM (${isPlastic ? 'Film' : 'Paper'})`;
 
@@ -706,8 +712,9 @@ function runOptimizer() {
     // Score 1 (Balanced): Equal balance of scrap control and weight deviation
     const scoreBalanced = (scrapPct * 1.5) + (meanPctDiff * 0.8) + (maxPctDiff * 0.4);
 
-    // Score 2 (Min Scrap): Heavy weight on scrap minimization
-    const scoreMinScrap = (scrapPct * 4.0) + (meanPctDiff * 0.5);
+    // Score 2 (Min Scrap): factory priority. Least trim always wins (a 0.01% scrap difference
+    // outweighs any weight difference); weight accuracy only breaks ties between equal trims.
+    const scoreMinScrap = (scrapPct * 100000) + meanPctDiff + (maxPctDiff * 0.1);
 
     // Score 3 (Weight Fidelity): Heavy weight on precision kg delivery
     const scoreExactKg = (scrapPct * 0.5) + (meanPctDiff * 2.5) + (maxPctDiff * 1.5);
@@ -720,8 +727,9 @@ function runOptimizer() {
       effectiveRollWidth,
       usedTolMm,
       toleranceActive: usedTolMm > 0,
-      trimLeft: +(trimWidth / 2).toFixed(1),
-      trimRight: +(trimWidth / 2).toFixed(1),
+      // All trim goes on one side (never split), so knives start at 0 mm
+      trimLeft: 0,
+      trimRight: +trimWidth.toFixed(1),
       scrapPct: +scrapPct.toFixed(2),
       scrapKg: +(masterWeight * (trimWidth / effectiveRollWidth)).toFixed(1),
       fgKg: +(masterWeight * (cutsWidth / effectiveRollWidth)).toFixed(1),
@@ -865,26 +873,25 @@ function runOptimizer() {
     return;
   }
 
-  // Filter and pick Top 3 Distinct Recipes
-  // 1. Champion Balanced
-  candidates.sort((a, b) => a.scoreBalanced - b.scoreBalanced);
-  const bestBalanced = candidates[0];
+  // Pick 3 distinct recipes. Factory priority: minimum wastage first.
+  const sameBlades = (a, b) => JSON.stringify(a?.bladeCounts) === JSON.stringify(b?.bladeCounts);
 
-  // 2. Minimum Scrap Champion
+  // 1. Minimum Wastage (the true best, never displaced by another recipe)
   const minScrapList = [...candidates].sort((a, b) => a.scoreMinScrap - b.scoreMinScrap);
-  const bestMinScrap = minScrapList.find(c => JSON.stringify(c.bladeCounts) !== JSON.stringify(bestBalanced?.bladeCounts)) || minScrapList[0];
+  const bestMinScrap = minScrapList[0];
 
-  // 3. Precision Weight Fidelity Champion
+  // 2. Balanced trade-off between wastage and kg accuracy
+  const balancedList = [...candidates].sort((a, b) => a.scoreBalanced - b.scoreBalanced);
+  const bestBalanced = balancedList.find(c => !sameBlades(c, bestMinScrap)) || balancedList[0];
+
+  // 3. Closest to the requested kg
   const exactKgList = [...candidates].sort((a, b) => a.scoreExactKg - b.scoreExactKg);
-  const bestExactKg = exactKgList.find(c => 
-    JSON.stringify(c.bladeCounts) !== JSON.stringify(bestBalanced?.bladeCounts) && 
-    JSON.stringify(c.bladeCounts) !== JSON.stringify(bestMinScrap?.bladeCounts)
-  ) || exactKgList[0];
+  const bestExactKg = exactKgList.find(c => !sameBlades(c, bestMinScrap) && !sameBlades(c, bestBalanced)) || exactKgList[0];
 
   state.solutions = [
-    { type: 'balanced', title: 'Recipe A: Optimal Balanced (Recommended)', badge: 'Best Trade-Off', data: bestBalanced },
-    { type: 'minscrap', title: 'Recipe B: Maximum Roll Yield', badge: 'Lowest Scrap', data: bestMinScrap },
-    { type: 'exactkg',  title: 'Recipe C: Precision Target Weight', badge: 'Closest Kg', data: bestExactKg }
+    { type: 'minscrap', title: 'Recipe A: Minimum Wastage (Recommended)', badge: 'Lowest Trim', data: bestMinScrap },
+    { type: 'balanced', title: 'Recipe B: Balanced', badge: 'Trade-Off', data: bestBalanced },
+    { type: 'exactkg',  title: 'Recipe C: Closest to Ordered Kg', badge: 'Closest Kg', data: bestExactKg }
   ];
 
   // Keep selection or default to Recipe A
@@ -949,8 +956,8 @@ function updateCustomBladeCount(width, delta) {
 
   const trimWidth = masterWidth - cutsWidth;
   const scrapPct = (trimWidth / masterWidth) * 100;
-  const trimLeft = +(trimWidth / 2).toFixed(1);
-  const trimRight = +(trimWidth / 2).toFixed(1);
+  const trimLeft = 0; // all trim on one side
+  const trimRight = +trimWidth.toFixed(1);
 
   state.selectedSolution.data = {
     ...state.selectedSolution.data,
@@ -990,7 +997,7 @@ function renderKPIRibbon() {
   document.getElementById('kpiFgSub').innerText = `${((d.fgKg / state.master.weightKg) * 100).toFixed(1)}% yield from master`;
 
   document.getElementById('kpiScrap').innerText = `${d.scrapKg} kg (${d.scrapPct}%)`;
-  document.getElementById('kpiScrapSub').innerText = `Trim L: ${d.trimLeft}mm | R: ${d.trimRight}mm`;
+  document.getElementById('kpiScrapSub').innerText = `Trim: ${d.trimWidth.toFixed(1)} mm (one side)`;
 
   document.getElementById('kpiLinearMeters').innerText = `${state.master.linearMeters.toLocaleString()} m`;
 
@@ -1057,7 +1064,7 @@ function renderRecipeCards() {
     const div = document.createElement('div');
     div.className = `recipe-card ${isSelected ? 'active' : ''}`;
     div.innerHTML = `
-      <span class="recipe-badge ${sol.type === 'balanced' ? 'badge-champion' : ''}">${sol.badge}</span>
+      <span class="recipe-badge ${sol.type === 'minscrap' ? 'badge-champion' : ''}">${sol.badge}</span>
       <div class="recipe-header">
         <div class="recipe-title">${sol.title}</div>
       </div>
@@ -1153,49 +1160,41 @@ function renderRollVisualizer() {
   if (scale) scale.innerHTML = '';
 
   const masterWidth = state.master.widthMm;
+  // Includes the parent-roll tolerance when used, so the strips always add up to 100%
+  const rollWidth = d.effectiveRollWidth || masterWidth;
 
-  // Left Trim Segment
-  if (d.trimLeft > 0) {
-    const leftTrimPct = (d.trimLeft / masterWidth) * 100;
+  // Scale the diagram so even the narrowest strip is >= 16px wide (fits a vertical label);
+  // with very narrow cuts the diagram gets wider and its wrapper scrolls sideways.
+  // (The trim strip has its own CSS min-width, so it doesn't stretch the diagram.)
+  const stripWidths = d.cutsMap.filter(c => c.count > 0).map(c => c.width);
+  const narrowest = Math.max(1, Math.min(...stripWidths));
+  const minPx = Math.min(4000, Math.ceil(Math.max(860, rollWidth * (16 / narrowest))));
+  schematic.style.minWidth = `${minPx}px`;
+  if (scale) scale.style.minWidth = `${minPx}px`;
+
+  // Operator view: each strip shows only its size in mm. Strips too narrow for
+  // horizontal text get the size written vertically.
+  function addSegment(widthMm, label, extraClass, color) {
+    const pct = (widthMm / rollWidth) * 100;
     const seg = document.createElement('div');
-    seg.className = 'roll-segment segment-trim';
-    seg.style.width = `${leftTrimPct}%`;
-    seg.title = `Left Edge Trim: ${d.trimLeft} mm`;
-    seg.innerHTML = `<span>Trim ${d.trimLeft}m</span>`;
+    seg.className = `roll-segment ${extraClass}`;
+    seg.style.width = `${pct}%`;
+    if (color) seg.style.backgroundColor = color;
+    seg.title = label;
+    const isNarrow = pct < 6;
+    seg.innerHTML = `<span class="seg-label${isNarrow ? ' seg-label-vertical' : ''}">${label}</span>`;
     schematic.appendChild(seg);
   }
 
-  // Finished Product Slits
-  let reelNumber = 1;
+  if (d.trimLeft > 0) addSegment(d.trimLeft, `Trim ${d.trimLeft} mm`, 'segment-trim');
+
   d.cutsMap.forEach(cut => {
     for (let i = 0; i < cut.count; i++) {
-      const cutPct = (cut.width / masterWidth) * 100;
-      const seg = document.createElement('div');
-      seg.className = 'roll-segment';
-      seg.style.width = `${cutPct}%`;
-      seg.style.backgroundColor = getColorForWidth(cut.width);
-      
-      const singleReelKg = (state.master.weightKg * (cut.width / masterWidth)).toFixed(1);
-      seg.title = `Reel #${reelNumber}: ${cut.width} mm (${singleReelKg} kg, ${state.master.linearMeters}m)`;
-      seg.innerHTML = `
-        <div style="font-size:0.75rem">${cut.width} mm</div>
-        <div style="font-size:0.6rem; opacity:0.85">#${reelNumber} (${singleReelKg}kg)</div>
-      `;
-      schematic.appendChild(seg);
-      reelNumber++;
+      addSegment(cut.width, `${cut.width} mm`, '', getColorForWidth(cut.width));
     }
   });
 
-  // Right Trim Segment
-  if (d.trimRight > 0) {
-    const rightTrimPct = (d.trimRight / masterWidth) * 100;
-    const seg = document.createElement('div');
-    seg.className = 'roll-segment segment-trim';
-    seg.style.width = `${rightTrimPct}%`;
-    seg.title = `Right Edge Trim: ${d.trimRight} mm`;
-    seg.innerHTML = `<span>Trim ${d.trimRight}m</span>`;
-    schematic.appendChild(seg);
-  }
+  if (d.trimRight > 0) addSegment(d.trimRight, `Trim ${d.trimRight} mm`, 'segment-trim');
 
   // Ruler markings
   if (scale) {
@@ -1254,8 +1253,8 @@ function renderBladeStopsTable() {
   const trTrim = document.createElement('tr');
   trTrim.style.background = 'rgba(239, 68, 68, 0.08)';
   trTrim.innerHTML = `
-    <td colspan="2"><strong style="color:var(--accent-red)">Edge Trims</strong></td>
-    <td colspan="2"><span style="white-space:nowrap;">Left: <strong>${d.trimLeft}mm</strong> | Right: <strong>${d.trimRight}mm</strong></span></td>
+    <td colspan="2"><strong style="color:var(--accent-red)">Edge Trim</strong></td>
+    <td colspan="2"><span style="white-space:nowrap;"><strong>${d.trimWidth.toFixed(1)} mm</strong> on one side only</span></td>
     <td><strong>${d.scrapKg} kg</strong></td>
     <td><span style="color:var(--text-muted); font-size:0.75rem;">${d.scrapPct}% waste</span></td>
     <td><span class="badge badge-danger" style="padding:1px 6px;">Edge Blower</span></td>
@@ -1431,7 +1430,7 @@ function renderPrintJobCard() {
       <div><strong>Master Gross Weight:</strong> ${state.master.weightKg} kg</div>
       <div><strong>Total Linear Web:</strong> ${state.master.linearMeters.toLocaleString()} running meters</div>
       <div><strong>Finished Goods Yield:</strong> ${d.fgKg} kg (${((d.fgKg/state.master.weightKg)*100).toFixed(1)}%)</div>
-      <div><strong>Edge Offcut Scrap:</strong> ${d.scrapKg} kg (${d.scrapPct}%) | L: ${d.trimLeft}mm, R: ${d.trimRight}mm</div>
+      <div><strong>Edge Offcut Scrap:</strong> ${d.scrapKg} kg (${d.scrapPct}%) | Trim ${d.trimWidth.toFixed(1)} mm on one side</div>
       <div><strong>Slitter Speed:</strong> ${state.master.machineSpeed} m/min</div>
       <div><strong>Total Machine Rounds:</strong> ${totalSets} Uniform Cycles</div>
       <div><strong>Rewind Core:</strong> ${coreDia}" Paper Tube (${(coreDia * 25.4).toFixed(1)} mm ID)</div>
@@ -1459,24 +1458,12 @@ function renderPrintJobCard() {
         </tr>
       </thead>
       <tbody>
-        <!-- Left Trim Indicator -->
-        <tr style="background:#fff3f3;">
-          <td style="text-align:center; font-weight:700;">-</td>
-          <td style="text-align:center;">Left Trim</td>
-          <td style="font-family:var(--font-mono); font-size:8pt; color:#b91c1c;">0.0 mm &rarr; ${d.trimLeft.toFixed(1)} mm</td>
-          <td style="text-align:center; color:#b91c1c; font-weight:700;">${d.trimLeft} mm</td>
-          <td style="text-align:center; color:#777; font-size:7.5pt;">Edge Trim Blower / Suction</td>
-          <td style="text-align:center;">-</td>
-          <td style="text-align:center;">-</td>
-          <td style="text-align:right; color:#b91c1c;">Scrap</td>
-          <td style="text-align:center;">✓</td>
-        </tr>
         ${bladeRowsHtml}
-        <!-- Right Trim Indicator -->
+        <!-- Edge Trim (all on one side) -->
         <tr style="background:#fff3f3;">
           <td style="text-align:center; font-weight:700;">-</td>
-          <td style="text-align:center;">Right Trim</td>
-          <td style="font-family:var(--font-mono); font-size:8pt; color:#b91c1c;">${(state.master.widthMm - d.trimRight).toFixed(1)} mm &rarr; ${state.master.widthMm.toFixed(1)} mm</td>
+          <td style="text-align:center;">Edge Trim</td>
+          <td style="font-family:var(--font-mono); font-size:8pt; color:#b91c1c;">${d.cutsWidth.toFixed(1)} mm &rarr; ${(d.effectiveRollWidth || state.master.widthMm).toFixed(1)} mm</td>
           <td style="text-align:center; color:#b91c1c; font-weight:700;">${d.trimRight} mm</td>
           <td style="text-align:center; color:#777; font-size:7.5pt;">Edge Trim Blower / Suction</td>
           <td style="text-align:center;">-</td>
