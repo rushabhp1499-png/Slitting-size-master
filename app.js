@@ -22,7 +22,7 @@ const state = {
     minTrimLeft: 0,
     minTrimRight: 8,
     minSlitWidth: 6, // standard minimum slit width
-    maxKnives: 50, // most knives the slitter shaft can hold
+    maxKnives: 100, // most knives the slitter shaft can hold
     weightTolerancePct: 15, // weight variance shown as OK vs High Var
     machineSpeed: 400,
     setupMinutes: 20,
@@ -653,7 +653,7 @@ function runOptimizer() {
   // The roll is exactly the master width (e.g. 1020 mm): no parent-roll tolerance is ever used
   const maxSearchWidth = usableWidth;
   const minCuts = (minSum <= usableWidth) ? 1 : 0;
-  const maxKnives = state.master.maxKnives || 50;
+  const maxKnives = state.master.maxKnives || 100;
   let bladeLimitRejects = 0;
 
   function evaluateCandidate(bladeCounts, cutsWidth) {
@@ -903,7 +903,7 @@ function selectRecipe(sol) {
  */
 function updateCustomBladeCount(width, delta) {
   const current = state.customBlades[width] || 0;
-  const maxKnives = state.master.maxKnives || 50;
+  const maxKnives = state.master.maxKnives || 100;
   const bladesNow = Object.values(state.customBlades).reduce((a, b) => a + b, 0);
   if (delta > 0 && bladesNow >= maxKnives) {
     alert(`The machine holds at most ${maxKnives} knives. Remove a knife from another size first.`);
