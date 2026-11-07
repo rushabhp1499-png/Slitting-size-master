@@ -18,7 +18,8 @@ const state = {
     widthMm: 1020, // standard parent roll width (1020 mm)
     weightKg: 1000,
     // Fixed factory settings (not shown in the UI)
-    // Minimum edge trim, always taken on one side: 6 mm above 150 µm, else 8 mm (set in calculateMaterialSpecs)
+    // Smallest edge trim the machine can take (one side only): 6 mm above 150 µm, else 8 mm.
+    // Trim itself is optional: 0 mm when the cuts fill the roll exactly.
     minTrimLeft: 0,
     minTrimRight: 8,
     minSlitWidth: 6, // standard minimum slit width
@@ -379,8 +380,8 @@ function calculateMaterialSpecs() {
     activeThicknessMicrons = state.master.paperThicknessMicrons || Math.round(state.master.gsm * 1.3);
   }
 
-  // Thick material (> 150 µm) can be trimmed down to 6 mm; thinner material needs at least 8 mm.
-  // All trim is on one side, so it is applied to the right edge only.
+  // Trim is optional, but when there is one it is at least 6 mm for thick material (> 150 µm)
+  // and 8 mm otherwise. All trim is on one side (the right edge).
   state.master.minTrimLeft = 0;
   state.master.minTrimRight = activeThicknessMicrons > 150 ? 6 : 8;
 
@@ -605,7 +606,10 @@ function loadOrdersFromText(text) {
  * minimizes edge scrap, and achieves closest proportional target weights.
  */
 function runOptimizer() {
-  const usableWidth = state.master.widthMm - (state.master.minTrimLeft + state.master.minTrimRight);
+  // Trim is not compulsory: cuts may use the full master width (0 mm trim). Only when there
+  // is leftover must that one-side trim be at least the machine minimum (see evaluateCandidate).
+  const usableWidth = state.master.widthMm;
+  const minTrim = state.master.minTrimRight;
   const masterWeight = state.master.weightKg;
   const masterWidth = state.master.widthMm;
 
@@ -662,10 +666,12 @@ function runOptimizer() {
       bladeLimitRejects++;
       return null;
     }
-    // Cuts plus the minimum one-side trim must fit inside the master width
+    // Cuts must fit inside the master width
     if (cutsWidth > usableWidth + 1e-9) return;
 
+    // Either no trim at all, or a trim the machine can actually take off (>= minimum)
     const trimWidth = masterWidth - cutsWidth;
+    if (trimWidth > 1e-9 && trimWidth < minTrim - 1e-9) return;
     const scrapPct = (trimWidth / masterWidth) * 100;
 
     let totalWeightDiff = 0;
@@ -852,7 +858,7 @@ function runOptimizer() {
     if (feasibilityBanner) {
       feasibilityBanner.style.display = 'flex';
       feasibilityBanner.className = 'alert alert-danger';
-      feasibilityBanner.innerHTML = `<div><strong>No single-setup layout found:</strong> these sizes cannot be cut from one roll within ${maxKnives} knives and the usable width (${usableWidth} mm). Remove some sizes or split the order into two setups.</div>`;
+      feasibilityBanner.innerHTML = `<div><strong>No single-setup layout found:</strong> these sizes cannot be cut from one ${masterWidth} mm roll within ${maxKnives} knives. Any leftover must be either 0 mm or a trim of at least ${minTrim} mm. Change a size or split the order into two setups.</div>`;
     }
     state.solutions = [];
     state.selectedSolution = null;
