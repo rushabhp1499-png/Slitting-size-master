@@ -388,10 +388,14 @@ function calculateMaterialSpecs() {
   const gsmBadge = document.getElementById('computedGsmBadge');
   if (gsmBadge) gsmBadge.innerText = `${state.master.gsm} GSM (${isPlastic ? 'Film' : 'Paper'})`;
 
-  // Total Master Linear Web length: L = (Weight in kg * 1,000,000) / (GSM * Width in mm)
+  // Web length: L = (Weight in kg * 1,000,000) / (GSM * Width in mm).
+  // Uses the weight the chosen layout actually runs (a small order runs only part of the jumbo).
   const masterWidthM = state.master.widthMm / 1000;
-  const areaM2 = (state.master.weightKg * 1000) / state.master.gsm;
-  state.master.linearMeters = Math.round(areaM2 / masterWidthM);
+  const chosenRunKg = state.selectedSolution?.data?.runKg;
+  const runKg = chosenRunKg > 0 ? Math.min(chosenRunKg, state.master.weightKg) : state.master.weightKg;
+  state.master.runKg = runKg;
+  state.master.rollLinearMeters = Math.round((state.master.weightKg * 1000) / state.master.gsm / masterWidthM);
+  state.master.linearMeters = Math.round((runKg * 1000) / state.master.gsm / masterWidthM);
 
   const lengthEl = document.getElementById('kpiLinearMeters');
   if (lengthEl) lengthEl.innerText = `${state.master.linearMeters.toLocaleString()} m`;
@@ -538,6 +542,18 @@ function updateOrdersSummary() {
 }
 
 /**
+ * How many kg of the jumbo must be run for a knife layout that uses `cutsWidth` mm.
+ * When the order is smaller than the roll, only run enough length for the cuts to make
+ * the ordered total; the rest of the jumbo stays unslit. Otherwise the whole roll is run.
+ */
+function runWeightFor(cutsWidth) {
+  const rollKg = state.master.weightKg;
+  const orderedKg = state.orders.reduce((s, o) => s + (o.targetKg || 0), 0);
+  if (!(orderedKg > 0) || !(cutsWidth > 0) || orderedKg >= rollKg) return rollKg;
+  return Math.min(rollKg, orderedKg * state.master.widthMm / cutsWidth);
+}
+
+/**
  * Inputs changed: dim the results until the user presses Calculate
  */
 function markResultsStale() {
@@ -679,11 +695,14 @@ function runOptimizer() {
     let totalPctDiff = 0;
     let fulfilledCount = 0;
 
+    // Only as much of the jumbo as this layout needs (all of it for big orders)
+    const runKg = runWeightFor(cutsWidth);
+
     const cutsMap = [];
     items.forEach(it => {
       const count = bladeCounts[it.width] || 0;
       if (count > 0) fulfilledCount++;
-      const producedKg = masterWeight * ((count * it.width) / masterWidth);
+      const producedKg = runKg * ((count * it.width) / masterWidth);
       const diffKg = producedKg - it.targetKg;
       const pctDiff = it.targetKg > 0 ? (Math.abs(diffKg) / it.targetKg) * 100 : 0;
 
@@ -724,8 +743,9 @@ function runOptimizer() {
       trimLeft: 0,
       trimRight: +trimWidth.toFixed(1),
       scrapPct: +scrapPct.toFixed(2),
-      scrapKg: +(masterWeight * (trimWidth / masterWidth)).toFixed(1),
-      fgKg: +(masterWeight * (cutsWidth / masterWidth)).toFixed(1),
+      runKg: +runKg.toFixed(1),
+      scrapKg: +(runKg * (trimWidth / masterWidth)).toFixed(1),
+      fgKg: +(runKg * (cutsWidth / masterWidth)).toFixed(1),
       totalBlades,
       fulfilledCount,
       meanPctDiff: +meanPctDiff.toFixed(1),
@@ -748,6 +768,7 @@ function runOptimizer() {
   // of sizes (the old recursive search grew exponentially and froze the browser beyond ~8 sizes).
   const SCALE = 10;
   const cap = Math.floor(maxSearchWidth * SCALE + 1e-6);
+  const dpRunKg = runWeightFor(masterWidth);
 
   function runWidthDp(perKnifePenalty) {
     let best = new Float64Array(cap + 1).fill(Infinity);
@@ -759,7 +780,8 @@ function runOptimizer() {
       const maxCuts = Math.min(maxKnives, Math.floor(cap / unit));
       const devByCuts = new Float64Array(maxCuts + 1);
       for (let c = 0; c <= maxCuts; c++) {
-        const producedKg = masterWeight * ((c * it.width) / masterWidth);
+        // Estimate for a full-width layout; evaluateCandidate() then uses the exact run weight
+        const producedKg = dpRunKg * ((c * it.width) / masterWidth);
         devByCuts[c] = (it.targetKg > 0 ? (Math.abs(producedKg - it.targetKg) / it.targetKg) * 100 : 0)
           + perKnifePenalty * c;
       }
@@ -901,7 +923,7 @@ function runOptimizer() {
 function selectRecipe(sol) {
   state.selectedSolution = sol;
   state.customBlades = { ...sol.data.bladeCounts };
-  renderAll();
+  applyRunLength();
 }
 
 /**
@@ -920,19 +942,18 @@ function updateCustomBladeCount(width, delta) {
 
   // Recalculate custom live metrics
   const masterWidth = state.master.widthMm;
-  const masterWeight = state.master.weightKg;
 
-  let cutsWidth = 0;
+  const cutsWidth = state.orders.reduce((s, it) => s + (state.customBlades[it.width] || 0) * it.width, 0);
+  const runKg = runWeightFor(cutsWidth);
   let totalBlades = 0;
   const cutsMap = [];
 
   state.orders.forEach(it => {
     const count = state.customBlades[it.width] || 0;
     const w = it.width;
-    cutsWidth += count * w;
     totalBlades += count;
 
-    const producedKg = masterWeight * ((count * w) / masterWidth);
+    const producedKg = runKg * ((count * w) / masterWidth);
     const diffKg = producedKg - it.targetKg;
     const pctDiff = it.targetKg > 0 ? (Math.abs(diffKg) / it.targetKg) * 100 : 0;
 
@@ -961,11 +982,22 @@ function updateCustomBladeCount(width, delta) {
     trimLeft,
     trimRight,
     scrapPct: +scrapPct.toFixed(2),
-    scrapKg: +(masterWeight * (trimWidth / masterWidth)).toFixed(1),
-    fgKg: +(masterWeight * (cutsWidth / masterWidth)).toFixed(1),
+    runKg: +runKg.toFixed(1),
+    scrapKg: +(runKg * (trimWidth / masterWidth)).toFixed(1),
+    fgKg: +(runKg * (cutsWidth / masterWidth)).toFixed(1),
     totalBlades
   };
 
+  applyRunLength();
+}
+
+/**
+ * The run length (and so rounds, roll length and time) depends on how much of the jumbo
+ * the chosen layout runs, so recompute it whenever the layout changes.
+ */
+function applyRunLength() {
+  calculateMaterialSpecs();
+  syncRollFields();
   renderAll();
 }
 
@@ -985,8 +1017,31 @@ function renderKPIRibbon() {
   const totalSets = state.master.uniformCyclesCount;
   const setMeters = state.master.uniformCycleMeters;
 
+  const runKg = state.master.runKg || state.master.weightKg;
+  const isPartialRun = runKg < state.master.weightKg - 0.05;
+  const leftKg = +(state.master.weightKg - runKg).toFixed(1);
+
   document.getElementById('kpiFgWeight').innerText = `${d.fgKg} kg`;
-  document.getElementById('kpiFgSub').innerText = `${((d.fgKg / state.master.weightKg) * 100).toFixed(1)}% yield from master`;
+  document.getElementById('kpiFgSub').innerText = isPartialRun
+    ? `from ${+runKg.toFixed(1)} kg of the ${state.master.weightKg} kg roll`
+    : `${((d.fgKg / state.master.weightKg) * 100).toFixed(1)}% yield from master`;
+
+  const linearSub = document.getElementById('kpiLinearSub');
+  if (linearSub) {
+    linearSub.innerText = isPartialRun
+      ? `to run, of ${state.master.rollLinearMeters.toLocaleString()} m on the roll`
+      : 'Linear running meters';
+  }
+
+  const partialNote = document.getElementById('partialRunNote');
+  if (partialNote) {
+    partialNote.style.display = isPartialRun ? 'block' : 'none';
+    partialNote.innerHTML = isPartialRun
+      ? `<strong>Part roll run:</strong> the order needs only <strong>${+runKg.toFixed(1)} kg</strong>
+         (${state.master.linearMeters.toLocaleString()} m) of the ${state.master.weightKg} kg jumbo, slit across the full width.
+         <strong>${leftKg} kg</strong> stays on the jumbo, unslit.`
+      : '';
+  }
 
   document.getElementById('kpiScrap').innerText = `${d.scrapKg} kg (${d.scrapPct}%)`;
   document.getElementById('kpiScrapSub').innerText = `Trim: ${d.trimWidth.toFixed(1)} mm (one side)`;
@@ -1065,7 +1120,7 @@ function renderRollSetsTable() {
     // Weight of 1 full roll: Length(m) * Width(m) * GSM / 1000 kg
     const singleRollKg = +(setMeters * (cut.width / 1000) * (state.master.gsm / 1000)).toFixed(2);
     const totalWidthAlloc = cut.count * cut.width;
-    const totalFgKg = +(state.master.weightKg * (totalWidthAlloc / state.master.widthMm)).toFixed(1);
+    const totalFgKg = +((d.runKg || state.master.weightKg) * (totalWidthAlloc / state.master.widthMm)).toFixed(1);
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1346,7 +1401,10 @@ function renderPrintJobCard() {
 
     <div class="jc-specs">
       <div><span>Material</span><strong>${material}</strong></div>
-      <div><span>Master Roll</span><strong>${state.master.widthMm} mm &times; ${state.master.weightKg} kg</strong></div>
+      <div><span>Master Roll</span><strong>${state.master.widthMm} mm &times; ${state.master.weightKg} kg</strong>${
+        (state.master.runKg || state.master.weightKg) < state.master.weightKg - 0.05
+          ? `<em class="jc-run">Run only ${+state.master.runKg.toFixed(1)} kg / ${state.master.linearMeters.toLocaleString()} m</em>`
+          : ''}</div>
       <div><span>Job Qty</span><strong>${state.jobCard.jobQtyKg ? `${escapeHtml(state.jobCard.jobQtyKg)} kg` : '<span class="jc-blank short"></span> kg'}</strong></div>
       <div><span>Core / OD</span><strong>${coreDia}" / ${resultingOd}"</strong></div>
       <div><span>Length per Roll</span><strong>${setMeters.toLocaleString()} m</strong></div>

@@ -366,6 +366,16 @@ body.results-stale .calc-btn {
   font-size: 0.85rem;
 }
 
+.partial-run-note {
+  margin-bottom: 0.6rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--accent-blue);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  background: rgba(2, 132, 199, 0.08);
+}
+
 body.results-stale .stale-notice {
   display: block;
 }
@@ -1092,6 +1102,13 @@ body.customer-mode .customer-quote-banner {
   .jc-specs strong {
     font-size: 11pt;
     white-space: nowrap;
+  }
+
+  .jc-specs .jc-run {
+    font-style: normal;
+    font-weight: 800;
+    font-size: 9pt;
+    text-decoration: underline;
   }
 
   .jc-specs .jc-blank.short {
