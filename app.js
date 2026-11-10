@@ -386,7 +386,7 @@ function calculateMaterialSpecs() {
   state.master.minTrimRight = activeThicknessMicrons > 150 ? 6 : 8;
 
   const gsmBadge = document.getElementById('computedGsmBadge');
-  if (gsmBadge) gsmBadge.innerText = `${state.master.gsm} GSM (${isPlastic ? 'Film' : 'Paper'})`;
+  if (gsmBadge) gsmBadge.innerText = `${+state.master.gsm.toFixed(2)} GSM (${isPlastic ? 'Film' : 'Paper'})`;
 
   // Web length: L = (Weight in kg * 1,000,000) / (GSM * Width in mm).
   // Uses the weight the chosen layout actually runs (a small order runs only part of the jumbo).
@@ -541,6 +541,9 @@ function updateOrdersSummary() {
   }
 }
 
+// Widths add up in floating point (e.g. 61 × 25.4 = 1549.3999999…); keep mm values to 2 decimals
+const mm2 = (x) => +x.toFixed(2);
+
 /**
  * How many kg of the jumbo must be run for a knife layout that uses `cutsWidth` mm.
  * When the order is smaller than the roll, only run enough length for the cuts to make
@@ -677,6 +680,7 @@ function runOptimizer() {
   let bladeLimitRejects = 0;
 
   function evaluateCandidate(bladeCounts, cutsWidth) {
+    cutsWidth = mm2(cutsWidth);
     const totalBlades = Object.values(bladeCounts).reduce((a, b) => a + b, 0);
     if (totalBlades > maxKnives) { // Machine shaft cannot hold more knives
       bladeLimitRejects++;
@@ -686,7 +690,7 @@ function runOptimizer() {
     if (cutsWidth > usableWidth + 1e-9) return;
 
     // Either no trim at all, or a trim the machine can actually take off (>= minimum)
-    const trimWidth = masterWidth - cutsWidth;
+    const trimWidth = mm2(masterWidth - cutsWidth);
     if (trimWidth > 1e-9 && trimWidth < minTrim - 1e-9) return;
     const scrapPct = (trimWidth / masterWidth) * 100;
 
@@ -713,7 +717,7 @@ function runOptimizer() {
       cutsMap.push({
         width: it.width,
         count: count,
-        totalWidth: count * it.width,
+        totalWidth: mm2(count * it.width),
         producedKg: +producedKg.toFixed(1),
         targetKg: it.targetKg,
         diffKg: +diffKg.toFixed(1),
@@ -759,7 +763,7 @@ function runOptimizer() {
   }
 
   function widthOf(bladeCounts) {
-    return items.reduce((sum, it) => sum + (bladeCounts[it.width] || 0) * it.width, 0);
+    return mm2(items.reduce((sum, it) => sum + (bladeCounts[it.width] || 0) * it.width, 0));
   }
 
   // Dynamic-programming search over total cut width in 0.1 mm steps.
@@ -943,7 +947,7 @@ function updateCustomBladeCount(width, delta) {
   // Recalculate custom live metrics
   const masterWidth = state.master.widthMm;
 
-  const cutsWidth = state.orders.reduce((s, it) => s + (state.customBlades[it.width] || 0) * it.width, 0);
+  const cutsWidth = mm2(state.orders.reduce((s, it) => s + (state.customBlades[it.width] || 0) * it.width, 0));
   const runKg = runWeightFor(cutsWidth);
   let totalBlades = 0;
   const cutsMap = [];
@@ -960,7 +964,7 @@ function updateCustomBladeCount(width, delta) {
     cutsMap.push({
       width: w,
       count: count,
-      totalWidth: count * w,
+      totalWidth: mm2(count * w),
       producedKg: +producedKg.toFixed(1),
       targetKg: it.targetKg,
       diffKg: +diffKg.toFixed(1),
@@ -968,7 +972,7 @@ function updateCustomBladeCount(width, delta) {
     });
   });
 
-  const trimWidth = masterWidth - cutsWidth;
+  const trimWidth = mm2(masterWidth - cutsWidth);
   const scrapPct = (trimWidth / masterWidth) * 100;
   const trimLeft = 0; // all trim on one side
   const trimRight = +trimWidth.toFixed(1);
