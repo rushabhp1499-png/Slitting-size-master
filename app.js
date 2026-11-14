@@ -941,6 +941,23 @@ function updateCustomBladeCount(width, delta) {
     alert(`The machine holds at most ${maxKnives} knives. Remove a knife from another size first.`);
     return;
   }
+
+  // An added cut must still fit on the roll, leaving either no trim or at least the minimum trim
+  if (delta > 0) {
+    const rollWidth = state.master.widthMm;
+    const minTrim = state.master.minTrimRight;
+    const usedNow = Object.entries(state.customBlades).reduce((s, [w, c]) => s + Number(w) * c, 0);
+    const leftAfter = mm2(rollWidth - usedNow - width);
+    if (leftAfter < 0) {
+      alert(`No room for another ${width} mm cut: only ${mm2(rollWidth - usedNow)} mm of the ${rollWidth} mm roll is left.`);
+      return;
+    }
+    if (leftAfter > 0 && leftAfter < minTrim) {
+      alert(`Another ${width} mm cut would leave a ${leftAfter} mm trim, below the ${minTrim} mm minimum. Remove a smaller cut first.`);
+      return;
+    }
+  }
+
   const next = Math.max(0, current + delta);
   state.customBlades[width] = next;
 
